@@ -1,13 +1,11 @@
 "use server";
 
-import path from "path";
-import { writeFile, mkdir } from "fs/promises";
 import sharp from "sharp";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getProfessorIdOrThrow } from "@/lib/session";
+import { uploadAvatarFile } from "@/lib/storage";
 
-const AVATARS_DIR = path.join(process.cwd(), "public", "uploads", "avatars");
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -48,11 +46,7 @@ export async function uploadAvatar(formData: FormData): Promise<UploadAvatarResu
     .jpeg({ quality: 85 })
     .toBuffer();
 
-  await mkdir(AVATARS_DIR, { recursive: true });
-  const fileName = `${professorId}.jpg`;
-  await writeFile(path.join(AVATARS_DIR, fileName), processed);
-
-  const avatarUrl = `/uploads/avatars/${fileName}?v=${Date.now()}`;
+  const avatarUrl = await uploadAvatarFile(professorId, processed);
   await prisma.professor.update({
     where: { id: professorId },
     data: { avatarUrl },
