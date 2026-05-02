@@ -1,18 +1,18 @@
-# Telas de parâmetros e modelo de dados
+# Cadastros e modelo de dados
 
-Este documento descreve as telas de cadastro (turmas, alunos, períodos e atividades) que o professor usa para configurar suas turmas antes de começar a lançar notas, junto com o modelo de dados que as suporta.
+Cobre as telas de cadastro (turmas, alunos, períodos, atividades) e o schema que as suporta.
 
-> Status: Telas implementadas em 2026-04-30. Parte operacional (lançamento de notas, médias, boletim) ainda não construída.
+> Última atualização: 2026-05-02
 
 ---
 
 ## 1. Visão geral
 
 ```
-Login → /turmas (lista) → /turmas/[id] (detalhe) → tabs Alunos / Períodos / Atividades
+Login → /turmas (lista) → /turmas/[id] → tabs Alunos / Períodos / Atividades
 ```
 
-O professor é o **tenant** do sistema. Todo dado dele (turmas, alunos, períodos, atividades, notas) carrega o `professorId` na própria tabela. Isso garante isolamento entre contas e permite que cada query filtre direto pelo tenant, sem JOINs em cascata.
+O professor é o **tenant** do sistema. Toda entidade carrega `professorId` na própria tabela, permitindo isolamento por linha sem JOINs em cascata.
 
 ---
 
@@ -20,41 +20,33 @@ O professor é o **tenant** do sistema. Todo dado dele (turmas, alunos, período
 
 ### Princípio
 
-Todas as entidades de domínio têm uma coluna `professorId` que aponta direto para o `Professor` dono. Mesmo entidades "filhas" (Aluno, Periodo, Atividade, Nota) carregam o `professorId` da turma à qual pertencem.
+Todas as entidades de domínio têm coluna `professorId` apontando direto para `Professor`. Mesmo entidades "filhas" (Aluno, Periodo, Atividade, Nota) carregam o `professorId` da turma pai.
 
 ### Por que denormalizar `professorId`
 
-- **Queries simples** — toda consulta começa com `where: { professorId }`, sem precisar fazer JOIN com Turma para descobrir o dono.
-- **Defesa em profundidade** — uma falha em um JOIN ou em uma cláusula complexa não vaza dado entre tenants.
-- **Performance** — index em `professorId` por tabela faz scans de tenant rápidos.
+- **Queries simples** — toda consulta começa com `where: { professorId }`.
+- **Defesa em profundidade** — se uma cláusula falhar, o `professorId` redundante evita leak.
+- **Performance** — index em `professorId` por tabela.
 
 ### Como é aplicado no código
 
-- Toda server action começa com `getProfessorIdOrThrow()` (em `lib/session.ts`)
-- Mutações usam `prisma.<entidade>.updateMany` ou `findFirst` filtrando por `{ id, professorId }`. Se o registro não pertence ao professor, o resultado é "não encontrado".
-- `revalidatePath` é chamado após mutações para refrescar o cache do Next.
-
-### O que isso garante
-
-- Professor A nunca vê dado de Professor B.
-- Tentativa de editar/excluir um recurso passando um id de outro professor retorna erro genérico ("não encontrada"), sem leak.
+- Toda action chama `getProfessorIdOrThrow()` (em `lib/session.ts`) antes de qualquer query.
+- Mutações usam `findFirst({ id, professorId })` ou `updateMany({ where: { id, professorId } })`. Se o registro não pertence, retorna "não encontrado" sem leak.
+- `revalidatePath` após mutações invalida o cache do Next.
 
 ---
 
 ## 3. Modelo de dados
 
-### Diagrama de relações
+### Diagrama
 
 ```
 Professor (tenant)
-   │
-   ├──< Turma  ─── status: ATIVA | CONCLUIDA
+   ├──< Turma ─── status: ATIVA | CONCLUIDA
    │      ├──< Aluno
-   │      ├──< Periodo
-   │      │       └──< Atividade
-   │      │              └──< Nota
-   │      │                    │
-   │      └──< (Aluno) ───────>┘     (Nota liga Aluno + Atividade)
+   │      └──< Periodo (4 fixos: ordem 1..4) — modoCalculo: MEDIA | SOMA
+   │              └──< Atividade (com data dentro da vigência)
+   │                      └──< Nota (única por aluno × atividade)
    ▼
    (Cascade: deletar Professor apaga tudo)
 ```
@@ -63,107 +55,105 @@ Professor (tenant)
 
 #### `Professor`
 
-Conta do usuário do sistema.
-
 | Campo          | Tipo     | Notas                                   |
 |----------------|----------|-----------------------------------------|
 | `id`           | String   | UUID, PK                                |
 | `email`        | String   | único, lowercase normalizado na entrada |
 | `passwordHash` | String   | bcrypt (10 rounds)                      |
 | `nome`         | String   |                                         |
+| `avatarUrl`    | String?  | URL relativa do avatar (ver `perfil-e-auth.md`) |
 | `createdAt`    | DateTime |                                         |
 | `updatedAt`    | DateTime |                                         |
 
 #### `Turma`
 
-Uma turma de uma disciplina específica num ano letivo.
-
 | Campo         | Tipo          | Notas                                   |
 |---------------|---------------|-----------------------------------------|
 | `id`          | String        | UUID, PK                                |
-| `nome`        | String        | "9º Ano A"                              |
-| `nivel`       | `NivelEnsino` | `FUNDAMENTAL` ou `MEDIO`                |
-| `serie`       | String        | "9º", "1ª", livre                       |
+| `nome`        | String        | derivado: `"<serie>º <turma>"` (ex: "9º A") |
+| `turma`       | String        | letra ("A", "B", ...) — default "A"     |
+| `nivel`       | `NivelEnsino` | `FUNDAMENTAL_I`, `FUNDAMENTAL_II`, `MEDIO` (`FUNDAMENTAL` legado) |
+| `serie`       | String        | "9", "1ª", livre                        |
 | `disciplina`  | String        | "Matemática"                            |
-| `ano`         | Int           | ano letivo (ex: 2026)                   |
+| `ano`         | Int           | ano letivo                              |
 | `status`      | `TurmaStatus` | `ATIVA` (default) ou `CONCLUIDA`        |
 | `professorId` | String → FK   | dono                                    |
 
-Index: `professorId`. Cascade: ao deletar Professor → todas as turmas dele somem.
+Index: `professorId`. Cascade: deletar Professor → suas turmas somem.
 
 #### `Aluno`
-
-Aluno matriculado em uma turma específica.
 
 | Campo         | Tipo        | Notas                              |
 |---------------|-------------|------------------------------------|
 | `id`          | String      | UUID, PK                           |
 | `nome`        | String      |                                    |
-| `matricula`   | String?     | opcional (identificador da escola) |
 | `professorId` | String → FK | denormalizado da turma             |
 | `turmaId`     | String → FK | turma à qual pertence              |
 
 Index: `professorId`, `turmaId`. Cascade: deletar Turma → seus alunos somem.
 
-> **Decisão atual:** o aluno está vinculado a **uma única turma**. Se o professor lecionar a mesma pessoa em duas turmas (ex: matemática e física), terá que cadastrar duas vezes. Modelo de "Aluno" como pessoa global + matrícula como vínculo é uma evolução futura — ver `contexto-inicial.md`.
+> O **número de chamada** não é armazenado — é derivado da ordem alfabética dos alunos da turma a cada renderização. Reduz dor ao adicionar/renomear alunos.
+> Não tem `matricula` (campo removido). Identificação visual usa só nome + número derivado.
 
 #### `Periodo`
 
-Bimestre, trimestre ou semestre da turma.
+| Campo         | Tipo          | Notas                              |
+|---------------|---------------|------------------------------------|
+| `id`          | String        | UUID, PK                           |
+| `ordem`       | Int           | 1, 2, 3, 4 (4 fixos por turma)     |
+| `dataInicio`  | DateTime?     | UTC midnight, opcional             |
+| `dataFim`     | DateTime?     | UTC midnight, opcional             |
+| `modoCalculo` | `ModoCalculo` | `MEDIA` (default) ou `SOMA`        |
+| `professorId` | String → FK   |                                    |
+| `turmaId`     | String → FK   |                                    |
 
-| Campo         | Tipo        | Notas                              |
-|---------------|-------------|------------------------------------|
-| `id`          | String      | UUID, PK                           |
-| `nome`        | String      | "1º Bimestre"                      |
-| `ordem`       | Int         | 1, 2, 3, 4 — ordena na exibição    |
-| `professorId` | String → FK |                                    |
-| `turmaId`     | String → FK |                                    |
+Constraint: `@@unique([turmaId, ordem])` — não dá pra ter dois bimestres com a mesma ordem na mesma turma.
 
 Index: `professorId`, `turmaId`. Cascade: deletar Turma → períodos somem.
 
-> Não há constraint de unicidade em `[turmaId, ordem]` — o professor pode ter duas linhas com a mesma ordem. Avaliar adicionar caso vire problema na UX.
+> **`ensure4Periodos`** (em `lib/periodos-helper.ts`) é chamado pelas actions de listagem e garante que existam 4 períodos por turma (faz upsert nos faltantes). Cobre turmas antigas pré-feature.
 
 #### `Atividade`
-
-Avaliação dentro de um período (prova, trabalho, exercício, etc).
 
 | Campo         | Tipo        | Notas                              |
 |---------------|-------------|------------------------------------|
 | `id`          | String      | UUID, PK                           |
 | `nome`        | String      | "Prova mensal"                     |
 | `valorMaximo` | Float       | default 10                         |
+| `data`        | DateTime?   | UTC midnight, validada vs. vigência do período |
 | `professorId` | String → FK |                                    |
 | `periodoId`   | String → FK |                                    |
 
 Index: `professorId`, `periodoId`. Cascade: deletar Período → atividades somem.
 
-> **Sem `peso` por enquanto.** A regra de cálculo de média é simples (`soma das notas / quantidade`). Quando houver suporte a média ponderada, basta adicionar coluna `peso` nullable e migration de 1 linha.
+> Validação de `data`: se o período tem `dataInicio`/`dataFim`, a action rejeita atividades fora da janela. Validação tanto no cliente (Flatpickr min/max) quanto no servidor (Zod refine).
 
 #### `Nota`
-
-Valor que um aluno tirou em uma atividade.
 
 | Campo         | Tipo        | Notas                              |
 |---------------|-------------|------------------------------------|
 | `id`          | String      | UUID, PK                           |
-| `valor`       | Float       | nota lançada                       |
+| `valor`       | Float       | nota lançada (ver `notas.md` para semântica) |
 | `professorId` | String → FK |                                    |
 | `alunoId`     | String → FK |                                    |
 | `atividadeId` | String → FK |                                    |
 
-Constraint única: `[alunoId, atividadeId]` — um aluno só tem **uma** nota por atividade. Index: `professorId`. Cascade: deletar Aluno OU Atividade → notas somem.
+Constraint única: `@@unique([alunoId, atividadeId])` — um aluno só tem **uma** nota por atividade. Index: `professorId`. Cascade: deletar Aluno OU Atividade → notas somem.
 
 ### Enums
 
 ```prisma
-enum NivelEnsino { FUNDAMENTAL, MEDIO }
+enum NivelEnsino { FUNDAMENTAL, FUNDAMENTAL_I, FUNDAMENTAL_II, MEDIO }
 enum TurmaStatus { ATIVA, CONCLUIDA }
+enum ModoCalculo { MEDIA, SOMA }
 ```
+
+`FUNDAMENTAL` continua no enum por legado; novos cadastros usam `FUNDAMENTAL_I` ou `FUNDAMENTAL_II`.
 
 ### Cascade resumido
 
 ```
-Professor ─delete──> tudo dele (turmas → alunos, periodos, atividades, notas)
+Professor ─delete──> tudo (turmas → alunos, periodos, atividades, notas)
 Turma     ─delete──> alunos, periodos (e por consequência atividades + notas)
 Periodo   ─delete──> atividades (e por consequência notas)
 Aluno     ─delete──> notas dele
@@ -174,75 +164,74 @@ Atividade ─delete──> notas dela
 
 ## 4. Telas
 
-### Mapa de rotas
+### Mapa de rotas (cadastros)
 
 | Rota                                  | Tipo   | Propósito                                       |
 |---------------------------------------|--------|-------------------------------------------------|
 | `/`                                   | server | Redireciona para `/turmas`                      |
-| `/login`                              | client | Login com email/senha                           |
-| `/signup`                             | client | Criar conta (auto-login após sucesso)           |
 | `/turmas`                             | server | Lista de turmas do professor                    |
 | `/turmas/[id]`                        | server | Redireciona para `/turmas/[id]/alunos`          |
 | `/turmas/[id]/alunos`                 | server | Tab Alunos da turma                             |
-| `/turmas/[id]/periodos`               | server | Tab Períodos da turma                           |
-| `/turmas/[id]/atividades`             | server | Tab Atividades da turma (agrupadas por período) |
+| `/turmas/[id]/periodos`               | server | Tab Períodos (vigências)                        |
+| `/turmas/[id]/atividades`             | server | Tab Atividades (agrupadas por período, configura modoCalculo) |
 
 Tudo dentro de `(dashboard)` é protegido pelo `middleware.ts` — usuário não autenticado é redirecionado para `/login`.
 
 ### Layout `/turmas/[id]/layout.tsx`
 
-Renderiza o header da turma (nome, badge de status, disciplina/nível/série/ano), o menu de tabs e o ícone de ações (`...`) que abre menu com **Concluir / Reativar / Excluir** turma. Faz `getTurma(id)` e retorna 404 se não pertencer ao professor.
+Renderiza header da turma (nome, badge de status, disciplina/nível/série/ano), menu de tabs e ícone "..." com **Concluir / Reativar / Excluir**. Faz `getTurma(id)` e retorna 404 se não pertencer ao professor.
 
-### Detalhamento das telas
+### Detalhamento
 
 #### `/turmas` — Lista
 
-- Cards em grid responsivo (1 / 2 / 3 colunas)
-- Cada card: nome, badge de status (Ativa = verde / Concluída = cinza), disciplina, nível · série · ano
-- Click no card → `/turmas/[id]/alunos`
-- Botão `Nova turma` no canto superior direito → modal
-- Empty state: card centralizado convidando a criar a primeira turma
+- Cards em grid responsivo (1/2/3 colunas)
+- Card: nome, badge de status, disciplina, nível · série · ano
+- Click → `/turmas/[id]/alunos`
+- `Nova turma` no canto superior direito → modal
+- Empty state convidando a criar a primeira turma
 
-Modal `NovaTurmaButton`: nome, nível (select), série, ano, disciplina. Validação Zod. Toast em sucesso/erro.
+Modal `NovaTurmaButton`: nome (turma A/B/...), nível, série, ano, disciplina. Validação Zod. Toast.
 
-#### `/turmas/[id]/alunos` — Tab Alunos
+#### `/turmas/[id]/alunos`
 
-- Tabela: Nome, Matrícula (ou "—"), Ações
-- Botão `Adicionar aluno` no topo
-- Linha "..." abre dropdown com **Editar** (modal) e **Remover** (alert dialog)
-- Empty state quando a turma não tem alunos
+- Tabela: Nº (derivado), Nome, Ações
+- `Adicionar aluno` no topo
+- Linha "..." → dropdown **Editar** / **Remover**
+- Empty state se sem alunos
 
-#### `/turmas/[id]/periodos` — Tab Períodos
+#### `/turmas/[id]/periodos`
 
-- Tabela: Ordem, Nome, Ações
-- Ordenado por `ordem` ASC
-- Botão `Adicionar período` no topo (default da `ordem` = max+1 dos existentes)
-- Mesma UX de edição/remoção via dropdown
-- Empty state instrui a criar bimestres/trimestres antes de adicionar atividades
+- 4 cards (1º a 4º bimestre) com `dataInicio` / `dataFim` (Flatpickr pt-BR, locale brasileiro)
+- Botão `Salvar vigências` faz `updatePeriodosVigencia` em transação
+- Datas opcionais — sem vigência, atividades não são restritas
+- Auto-criação dos 4 períodos via `ensure4Periodos` se a turma é nova
 
-#### `/turmas/[id]/atividades` — Tab Atividades
+#### `/turmas/[id]/atividades`
 
-- **Agrupado por período** (cada seção mostra o nome do período + suas atividades)
-- Cada período tem seu próprio botão `Nova atividade` (já pré-seleciona o período)
-- Cada atividade: nome + valor máximo + ações (editar / remover)
-- Edição permite **mover** atividade entre períodos da mesma turma (não permite cross-turma — bloqueado na action)
-- Empty state da página: se não há períodos, mostra "Crie um período primeiro" com link para a tab Períodos
-- Empty state por período: se o período não tem atividades, card com "Nenhuma atividade neste período ainda"
+- **Agrupado por período** — cada seção mostra ordem do bimestre + toggle MEDIA/SOMA + atividades
+- Toggle de **modo de cálculo** por período (`setModoCalculoPeriodo`). Não-destrutivo: preserva `valorMaximo`.
+- Cada período tem `Nova atividade` (já pré-seleciona o período)
+- Atividade: nome, valorMaximo, data (validada contra vigência)
+- Edição permite **mover** entre períodos da mesma turma (cross-turma é bloqueado)
+- Empty state da página: se não há períodos, "Crie um período primeiro" com link
+- Empty state por período: "Nenhuma atividade neste período ainda"
+- **Aviso** se tenta criar atividade num período sem `dataInicio`/`dataFim` configurada — recomenda configurar vigência primeiro
 
 ---
 
-## 5. Server actions (API)
+## 5. Server actions
 
-Todas em `actions/<entidade>.ts`, todas escopadas por `professorId` através de `getProfessorIdOrThrow()`.
+Todas em `actions/<entidade>.ts`, todas escopadas via `getProfessorIdOrThrow()`.
 
 ### `actions/turmas.ts`
 
 | Função                              | Retorno         | O que faz                                      |
 |-------------------------------------|-----------------|------------------------------------------------|
-| `listTurmas()`                      | `Turma[]`       | lista todas (ATIVA primeiro, depois CONCLUIDA) |
+| `listTurmas()`                      | `Turma[]`       | lista (ATIVA primeiro, depois CONCLUIDA)       |
 | `getTurma(id)`                      | `Turma \| null` | busca por id (escopo por tenant)               |
-| `createTurma(input)`                | `Turma`         | cria com `status=ATIVA`                        |
-| `updateTurma(id, input)`            | `void`          | atualização parcial dos campos                 |
+| `createTurma(input)`                | `Turma`         | cria com `status=ATIVA`; auto-cria 4 períodos  |
+| `updateTurma(id, input)`            | `void`          | atualização parcial                            |
 | `archiveTurma(id)`                  | `void`          | seta `status=CONCLUIDA`                        |
 | `reactivateTurma(id)`               | `void`          | seta `status=ATIVA`                            |
 | `removeTurma(id)`                   | `void`          | hard delete (cascade leva tudo abaixo)         |
@@ -251,82 +240,48 @@ Todas em `actions/<entidade>.ts`, todas escopadas por `professorId` através de 
 
 | Função                              | Retorno     |
 |-------------------------------------|-------------|
-| `listAlunosByTurma(turmaId)`        | `Aluno[]`   |
+| `listAlunosByTurma(turmaId)`        | `Aluno[]` (ordenado por nome) |
 | `createAluno(turmaId, input)`       | `Aluno`     |
 | `updateAluno(id, input)`            | `void`      |
 | `removeAluno(id)`                   | `void`      |
 
-> Validações: `nome` obrigatório; `matricula` opcional, vira `null` se vazio.
-
 ### `actions/periodos.ts`
 
-| Função                              | Retorno     |
-|-------------------------------------|-------------|
-| `listPeriodosByTurma(turmaId)`      | `Periodo[]` (ordenado por `ordem`) |
-| `createPeriodo(turmaId, input)`     | `Periodo`   |
-| `updatePeriodo(id, input)`          | `void`      |
-| `removePeriodo(id)`                 | `void`      |
+| Função                              | Retorno          | O que faz                       |
+|-------------------------------------|------------------|---------------------------------|
+| `listPeriodosByTurma(turmaId)`      | `Periodo[]`      | chama `ensure4Periodos` antes   |
+| `updatePeriodosVigencia(turmaId, input)` | `void`     | atualiza `dataInicio`/`dataFim` dos 4 em uma transação |
+| `setModoCalculoPeriodo(periodoId, modo)` | `void`     | troca MEDIA ↔ SOMA do período    |
+
+> Não há mais `createPeriodo` / `removePeriodo` exposto — os 4 são fixos por turma.
 
 ### `actions/atividades.ts`
 
 | Função                                     | Retorno                                      |
 |--------------------------------------------|----------------------------------------------|
 | `listPeriodosComAtividades(turmaId)`       | `Periodo[]` com `atividades` aninhadas       |
-| `createAtividade(input)`                   | `Atividade` (input inclui `periodoId`)       |
-| `updateAtividade(id, input)`               | `void` (permite mover entre períodos da mesma turma) |
+| `createAtividade(input)`                   | `Atividade` — valida `data` vs. vigência     |
+| `updateAtividade(id, input)`               | `void` — permite mover entre períodos da mesma turma; valida `data` vs. vigência |
 | `removeAtividade(id)`                      | `void`                                       |
 
-> Bloqueio: `updateAtividade` rejeita se o `periodoId` novo pertencer a uma turma diferente.
+---
+
+## 6. Helpers
+
+- **`lib/session.ts`** — `getProfessorIdOrThrow()` extrai `professorId` da sessão (lança se não autenticado).
+- **`lib/periodos-helper.ts`** — `ensure4Periodos(turmaId, professorId)` faz upsert dos 4 períodos faltantes (idempotente).
+- **`lib/turma-format.ts`** — `NIVEL_LABEL`, `bimestreNome(ordem)`, `BIMESTRES_FIXOS = [1,2,3,4]`.
+- **`lib/dates.ts`** — `dbToIsoString`, `isoToLocalDate`, `localToIsoString`, `dbDateToLocalDate`, `formatBrazilDate`. Convertem entre UTC midnight (DB) e LOCAL midnight (UI).
 
 ---
 
-## 6. Fluxo de uso do professor
-
-1. **Cria conta** em `/signup` → auto-login → cai em `/turmas`
-2. **Cria turma** com nome, nível, série, disciplina, ano
-3. **Entra na turma** (clica no card)
-4. **Tab Alunos** → adiciona os alunos um por um (CSV no futuro)
-5. **Tab Períodos** → cria os bimestres/trimestres do ano (1, 2, 3, 4)
-6. **Tab Atividades** → para cada período, cria as avaliações (provas, trabalhos)
-7. _(futuro)_ Lançamento de notas: grid alunos × atividades
-8. _(futuro)_ Visualização de médias e boletim
-
----
-
-## 7. Pendências e próximos passos
-
-### Operacional (não implementado ainda)
-
-- **Lançamento de notas** — grid editável aluno × atividade dentro de um período
-- **Cálculo de média** — `AVG(nota)` por aluno por período (regra simples)
-- **Boletim do aluno** — visão consolidada com todas as notas e médias
-- **Exportação** (PDF, planilha) — depois do boletim
-
-### Polish e UX
-
-- **Importação CSV** de alunos (cadastro em massa)
-- **Breadcrumbs reais** (atualmente só link "← Turmas")
-- **Filtros e busca** na lista de turmas (quando passar de ~10)
-- **Avatar real** do professor (upload de foto)
-- **Validação de email** com link de confirmação (registrado em `contexto-inicial.md`)
-
-### Modelagem (a decidir)
-
-- **Aluno como pessoa global + Matrícula** separada — permite que o mesmo aluno apareça em várias turmas mantendo histórico
-- **Faltas/frequência**
-- **Recuperação** (atividade-específica? período? final de ano?)
-- **Disciplinas múltiplas por turma** (caso fundamental I)
-- **Pesos em atividades** quando trocarmos a regra de cálculo
-
----
-
-## 8. Arquivos relacionados
+## 7. Arquivos relacionados
 
 - `prisma/schema.prisma` — schema source-of-truth
 - `prisma/migrations/` — histórico de migrations
-- `lib/prisma.ts` — singleton do Prisma Client
+- `lib/prisma.ts` — singleton do Prisma Client (PrismaPg adapter)
 - `lib/session.ts` — helper de tenant
 - `lib/auth.ts` — config do NextAuth
-- `actions/` — todas as server actions
+- `actions/{turmas,alunos,periodos,atividades}.ts` — server actions
 - `app/(dashboard)/turmas/` — páginas
-- `components/{turmas,alunos,periodos,atividades}/` — componentes de UI por entidade
+- `components/{turmas,alunos,periodos,atividades}/` — componentes por entidade

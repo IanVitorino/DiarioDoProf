@@ -2,12 +2,18 @@
 
 Documento de visão geral do projeto. Serve como ponto de partida e referência rápida para próximas conversas e iterações.
 
-> Data inicial: 2026-04-30
-> Status: Telas de parâmetros implementadas (turmas, alunos, períodos, atividades). Operacional (lançamento de notas, médias, boletim) ainda pendente.
+> Última atualização: 2026-05-02
+> Status: Funcionalidades de cadastro, lançamento de notas, análise da turma e dashboard do aluno implementadas. Boletim/exportação ainda pendentes.
 
 ## Documentos relacionados
 
-- [`parametros.md`](parametros.md) — telas de cadastro implementadas, modelo de dados detalhado, server actions, multi-tenancy
+- [`README.md`](README.md) — índice de toda a documentação
+- [`parametros.md`](parametros.md) — telas de cadastro, modelo de dados, server actions, multi-tenancy
+- [`notas.md`](notas.md) — grid de notas e fórmulas de cálculo (MEDIA/SOMA)
+- [`analise-turma.md`](analise-turma.md) — dashboard analítico da turma
+- [`dashboard-aluno.md`](dashboard-aluno.md) — dashboard individual do aluno
+- [`perfil-e-auth.md`](perfil-e-auth.md) — autenticação, perfil e upload de avatar
+- [`ui-e-tema.md`](ui-e-tema.md) — layout, tema teal, branding
 
 ---
 
@@ -21,12 +27,12 @@ Sistema para professores gerenciarem o ano letivo. Projeto pessoal, **não comer
 ### Premissas
 
 - Multi-tenant: cada professor enxerga apenas seus dados.
-- Suporta múltiplos níveis de ensino (fundamental, médio).
+- Suporta múltiplos níveis de ensino (Fundamental I, Fundamental II, Médio).
 - Suporta múltiplas turmas por professor.
 - Turmas têm ciclo de vida — podem ser concluídas/arquivadas no fim do ano e continuam consultáveis em modo read-only.
 - Regras de cálculo de média devem ser flexíveis (cada escola/professor tem peso e recuperação diferentes).
 - Web primeiro, mobile possivelmente depois.
-- Deploy em servidor próprio futuramente.
+- Deploy em servidor próprio futuramente (S3 para uploads quando sair do dev local).
 
 ---
 
@@ -34,89 +40,108 @@ Sistema para professores gerenciarem o ano letivo. Projeto pessoal, **não comer
 
 ```
 Professor (tenant)
-  └── Turma                     [ativa | concluída]
+  └── Turma                     [ATIVA | CONCLUIDA]
         ├── Aluno(s)
-        ├── Período(s)          [bimestre | trimestre | semestre]
-        │     └── Atividade(s)  [prova, trabalho, participação...]
-        │           └── Nota (por aluno)
-        └── RegraDeCálculo      [como calcular a média]
+        └── Periodo(s)          [4 bimestres fixos, modoCalculo: MEDIA | SOMA]
+              └── Atividade(s)  [prova, trabalho, ...] (com data dentro da vigência)
+                    └── Nota (por aluno × atividade)
 ```
+
+Detalhes do schema em [`parametros.md`](parametros.md).
 
 ### Por que essa modelagem
 
-- **Professor é o tenant** → todas as queries filtram por `professor_id`. É o que garante isolamento entre contas.
-- **Período é entidade separada da turma** → cada escola usa um sistema diferente (bimestre, trimestre, semestre). Tornar isso dado e não código deixa o sistema flexível sem deploy.
-- **RegraDeCálculo como entidade própria** → permite presets reutilizáveis ("Média ponderada padrão da escola X") e evolução da lógica sem migração dolorosa.
+- **Professor é o tenant** → todas as queries filtram por `professorId`. É o que garante isolamento entre contas.
+- **Período tem `modoCalculo` próprio** → cada bimestre pode ser configurado para MEDIA (média simples das notas) ou SOMA (soma das notas com teto em 10), independentemente. Permite flexibilidade sem mudança de schema.
+- **Período tem vigência (`dataInicio`/`dataFim`)** → atividades só podem ser criadas dentro da janela do bimestre. UX evita atividade "órfã" de período.
+- **`Nota` denormaliza `professorId`** → defesa em profundidade contra leak entre tenants e queries mais simples (sem JOIN obrigatório).
 
 ---
 
 ## Fluxos principais
 
-1. **Onboarding** — Professor cria conta → cria primeira turma.
-2. **Setup da turma** — Define nível (fund/médio), série, disciplina, períodos do ano e regra de cálculo.
-3. **Cadastro de alunos** — Manual ou import (CSV / planilha). Import é praticamente obrigatório — ninguém digita 35 alunos à mão.
-4. **Operação do dia-a-dia** — Para cada período: cria atividades → lança notas dos alunos.
-5. **Cálculo automático** — Média do período e do ano calculada conforme a regra da turma.
-6. **Encerramento** — Conclui a turma no fim do ano → vira read-only/arquivada, continua consultável.
+1. **Onboarding** — Professor cria conta em `/signup` → auto-login → cai em `/turmas`.
+2. **Setup da turma** — Cria turma (nome, nível, série, disciplina, ano). 4 períodos fixos são auto-criados.
+3. **Configura períodos** — Define `dataInicio` e `dataFim` de cada bimestre (vigência).
+4. **Configura modo de cálculo** — Por bimestre, escolhe MEDIA ou SOMA.
+5. **Cadastro de alunos** — Manual via modal (CSV é evolução futura).
+6. **Atividades** — Para cada bimestre, cria avaliações (com data dentro da vigência).
+7. **Lançamento de notas** — Em `/notas`, escolhe turma + bimestre, edita um grid aluno × atividade.
+8. **Análise** — `/analise-turma` mostra média da turma, distribuição, ranking, evolução. `/dashboard-aluno` mostra visão individual.
+9. **Encerramento** — Conclui a turma no fim do ano → vira read-only/arquivada, continua consultável.
 
 ---
 
-## Stack sugerida
+## Stack atual
 
-| Camada | Sugestão | Justificativa |
+| Camada | Tecnologia | Notas |
 |---|---|---|
-| Frontend + Backend | **Next.js (App Router)** | Mesmo projeto para UI e API, deploy fácil, ecossistema maduro. |
-| Banco | **PostgreSQL** | Multi-tenant via `professor_id` em cada tabela; relacional encaixa bem no domínio. |
-| ORM | **Prisma** ou **Drizzle** | Prisma é mais didático; Drizzle é mais leve e SQL-first. |
-| Auth | **Auth.js (NextAuth)** | Padrão da comunidade Next; suporta OAuth (Google) — UX boa para professor. |
-| Deploy | **Vercel** (grátis) ou **VPS** | Vercel para começar; VPS quando quiser controle total. |
-| Mobile (futuro) | **PWA** primeiro, depois **React Native** se necessário | PWA cobre 80% dos casos e reaproveita a stack web. |
+| Frontend + Backend | **Next.js 14 (App Router)** | server actions, RSC |
+| Banco | **PostgreSQL** local | multi-tenant via `professorId` |
+| ORM | **Prisma 7** | client gerado em `lib/generated/prisma`, adapter `PrismaPg` |
+| Auth | **NextAuth v4 + Credentials** | bcrypt 10 rounds, JWT em cookie |
+| UI | **Tailwind + shadcn/ui** | tema customizado teal |
+| Forms | **React Hook Form + Zod** | `onSubmit`/`reValidateMode: onSubmit` |
+| Charts | **Recharts** | donut, bar, line, area |
+| Datas | **Flatpickr (pt-BR)** | inline em modais via `static: true` |
+| Imagens | **sharp** | resize/processing de avatares |
+| State | **Zustand** + persist | tema, layout, sidebar |
+| Deploy | local (dev) | S3 e VPS planejados |
 
 ---
-
-## Pontos a lapidar (decisões pendentes)
-
-Decisões que vão moldar o resto da arquitetura. Cada uma merece uma conversa dedicada antes de codar.
-
-1. **Flexibilidade da regra de cálculo**
-   - Presets fixos (ponderada, simples, com recuperação) **ou** fórmula livre?
-   - Trade-off: fórmula livre é poderosa mas difícil de validar e de explicar para o usuário.
-
-2. **Recuperação**
-   - Recupera atividade específica? Bimestre inteiro? Apenas final de ano?
-   - Cada escola adota uma política diferente.
-
-3. **Disciplina por turma**
-   - Ensino fundamental: 1 professor pode dar várias matérias para a mesma turma.
-   - Ensino médio: normalmente 1 professor por matéria por turma.
-   - Como modelar isso sem complicar o caso simples?
-
-4. **Matrícula vs. Aluno**
-   - Aluno pode transferir de turma no meio do ano.
-   - Vale separar `Matrícula` (vínculo com turma + período) de `Aluno` (pessoa) para preservar histórico?
-
-5. **Faltas/frequência**
-   - Entra no MVP de notas ou fica para a fase 2 (desenvolvimento do aluno)?
-
-6. **Boletim/exportação**
-   - Gerar PDF do boletim faz parte do MVP ou é incremento posterior?
-
-7. **Verificação de email no signup** (definido em 2026-04-30 como pendência)
-   - Decidido: **não** entra na primeira versão. Signup cria conta direto sem confirmação por email.
-   - Pendente: implementar quando tiver SMTP configurado / quando o projeto for publicado. Adiciona `Professor.emailVerifiedAt` no schema e fluxo de envio + token de confirmação.
 
 ## Decisões já fechadas
 
-- **Auth (2026-04-30):** next-auth + Credentials provider (email/senha), bcrypt, sessão JWT em cookie httpOnly. Sem OAuth por enquanto.
-- **Política de senha:** mínimo 8 caracteres. Sem exigência de complexidade (maiúscula/símbolo).
-- **Pós-signup:** auto-login imediato, redireciona para o dashboard.
-- **Regra de cálculo de média:** simples (soma das notas / quantidade de notas). Sem peso, sem fórmula custom — pode ser estendido depois sem migração dolorosa.
+### Auth e cadastro
+- **NextAuth Credentials** com email/senha. Sem OAuth.
+- **Senha:** mínimo 8 caracteres, sem exigência de complexidade.
+- **Pós-signup:** auto-login imediato, sem verificação de email (entra quando houver SMTP).
+- **Sessão:** JWT em cookie httpOnly. `avatarUrl` propagado via JWT.
+- **Logout:** redireciona para `/login`.
+
+### Modelo de dados
+- **Aluno está vinculado a uma única turma.** Mesma pessoa em duas turmas = dois cadastros. Modelo "Aluno como pessoa global + Matrícula" foi descartado nesta fase.
+- **Sem campo `matricula`** no Aluno (foi removido). Identificação interna por número de chamada (derivado da ordem alfabética).
+- **4 períodos fixos** por turma (1º a 4º bimestre), criados automaticamente. Trimestre/semestre não são suportados (decisão atual).
+- **`Periodo.modoCalculo`**: MEDIA ou SOMA. Default MEDIA.
+- **`Periodo.dataInicio` / `dataFim`**: vigência opcional, mas atividades dentro do bimestre são validadas contra ela.
+- **`Atividade.data`**: data da aplicação. Validada contra a vigência do período (cliente e servidor).
+
+### Cálculo de média
+- **MEDIA (default):** média aritmética simples das notas do bimestre. Vazio (sem nota lançada) conta como 0.
+- **SOMA:** soma das notas do bimestre, com teto em 10.
+- **Média anual:** média aritmética das médias dos bimestres que **têm atividades** (bimestre vazio é ignorado).
+- **Aprovação:** média anual ≥ 6.0 (referência usada na Análise).
+- **Sem peso, sem fórmula custom.** Adicionar coluna `peso` em Atividade é evolução futura sem migração dolorosa.
+
+### UI/UX
+- **Tema padrão:** teal customizado (HSL `174 64% 21%`). Customizer (gear icon) está oculto.
+- **Layout default:** semibox (sidebar com `m-6` flutuando).
+- **Sidebar:** colapsável com animação suave (transition-[width] 300ms ease-in-out). Logo acompanha encolhendo.
+- **Header:** sem search/inbox/notificações. Só fullscreen, theme toggle e profile. Título do módulo centralizado.
+- **Modais de feedback:** `AlertDialog` para erros e sucessos de auth. Toasts para CRUD comum.
+- **Forms:** validação só no submit (não enquanto digita).
 
 ---
 
-## Próximos passos sugeridos
+## Pendências e próximos passos
 
-1. Validar este escopo geral.
-2. Escolher um dos pontos pendentes acima e detalhar (sugestão: começar pela **regra de cálculo**, que é o coração do sistema).
-3. Modelo de dados detalhado (schema do banco).
-4. Definir MVP — quais entidades e fluxos entram na primeira versão funcional.
+### Operacional (a fazer)
+- **Boletim do aluno** — visão consolidada (todas as notas + médias) imprimível.
+- **Exportação PDF / planilha** dos boletins e da análise.
+- **Importação CSV de alunos** — cadastro em massa.
+- **Faltas/frequência** — entra no MVP de "desenvolvimento do aluno", fase 2.
+- **Verificação de email** no signup — quando houver SMTP.
+
+### Modelagem / arquitetura (a decidir)
+- **Aluno como pessoa global + Matrícula separada** — para histórico cross-turmas e transferência no meio do ano.
+- **Recuperação** — atividade-específica? bimestre? final de ano?
+- **Disciplinas múltiplas por turma** — caso Fundamental I (1 professor, várias matérias para a mesma turma).
+- **Pesos em atividades** — quando trocarmos a regra de cálculo.
+- **Trimestre/semestre** — hoje só bimestre.
+- **Storage de avatares no S3** — hoje em `public/uploads/avatars/<id>.jpg` (filesystem local). Migrar quando deploy.
+
+### UI/UX (incremento)
+- **Breadcrumbs** consistentes (hoje só link "← Turmas" em algumas telas).
+- **Filtros e busca** na lista de turmas (quando passar de ~10).
+- **Mobile responsivo** — testado superficialmente, refinamento futuro.
