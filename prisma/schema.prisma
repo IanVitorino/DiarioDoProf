@@ -27,12 +27,17 @@ enum ModoCalculo {
   SOMA
 }
 
+enum Turno {
+  MATUTINO
+  VESPERTINO
+  NOTURNO
+}
+
 model Professor {
   id           String   @id @default(uuid())
   email        String   @unique
   passwordHash String
   nome         String
-  avatarUrl    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -50,6 +55,8 @@ model Turma {
   nivel      NivelEnsino
   serie      String
   disciplina String
+  escola     String?
+  turno      Turno?
   ano        Int
   status     TurmaStatus @default(ATIVA)
   createdAt  DateTime    @default(now())

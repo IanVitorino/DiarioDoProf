@@ -65,11 +65,11 @@ const MobileSidebar = ({ className, trans }: { className?: string, trans: any })
     <>
       <div
         className={cn(
-          "fixed top-0  bg-card h-full w-[248px] z-[9999] ",
+          "fixed top-0 left-0 bg-card h-full w-[248px] z-[9999] transition-transform duration-300 ease-in-out",
           className,
           {
-            " -left-[300px] invisible opacity-0  ": !mobileMenu,
-            " left-0 visible opacity-100  ": mobileMenu,
+            "-translate-x-full": !mobileMenu,
+            "translate-x-0 shadow-xl": mobileMenu,
           }
         )}
       >
@@ -129,12 +129,16 @@ const MobileSidebar = ({ className, trans }: { className?: string, trans: any })
           </ul>
         </ScrollArea>
       </div>
-      {mobileMenu && (
-        <div
-          onClick={() => setMobileMenu(false)}
-          className="overlay bg-black/60 backdrop-filter backdrop-blur-sm opacity-100 fixed inset-0 z-[999]"
-        ></div>
-      )}
+      <div
+        onClick={() => setMobileMenu(false)}
+        className={cn(
+          "overlay bg-black/60 backdrop-filter backdrop-blur-sm fixed inset-0 z-[999] transition-opacity duration-300 ease-in-out",
+          {
+            "opacity-100 pointer-events-auto": mobileMenu,
+            "opacity-0 pointer-events-none": !mobileMenu,
+          }
+        )}
+      ></div>
     </>
   );
 };

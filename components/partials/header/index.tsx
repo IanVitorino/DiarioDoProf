@@ -10,7 +10,6 @@ import HorizontalMenu from "./horizontal-menu";
 import { PageTitle } from "./page-title";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
-import MobileMenuHandler from "./mobile-menu-handler";
 import ClassicHeader from "./layout/classic-header";
 import FullScreen from "./full-screen";
 
@@ -24,7 +23,6 @@ const NavTools = ({ isDesktop, isMobile, sidebarType }: { isDesktop: boolean; is
       <div className="ltr:pl-2 rtl:pr-2">
         <ProfileInfo />
       </div>
-      {!isDesktop && sidebarType !== "module" && <MobileMenuHandler />}
     </div>
   );
 };
@@ -52,7 +50,7 @@ const Header = ({ handleOpenSearch, trans }: { handleOpenSearch: () => void; tra
           "sticky top-0 z-50": navbarType === "sticky",
         })}
       >
-        <div className="w-full bg-card/90 backdrop-blur-lg md:px-6 px-[15px] py-3 border-b">
+        <div className="w-full bg-card md:px-6 px-[15px] py-3 border-b">
           <div className="flex justify-between items-center h-full relative">
             <HorizontalHeader handleOpenSearch={handleOpenSearch} />
             <PageTitle />
@@ -64,7 +62,7 @@ const Header = ({ handleOpenSearch, trans }: { handleOpenSearch: () => void; tra
           </div>
         </div>
         {isDesktop && (
-          <div className=" bg-card bg-card/90 backdrop-blur-lg  w-full px-6  shadow-md">
+          <div className=" bg-card bg-card  w-full px-6  shadow-md">
             <HorizontalMenu trans={trans} />
           </div>
         )}
@@ -75,14 +73,14 @@ const Header = ({ handleOpenSearch, trans }: { handleOpenSearch: () => void; tra
     return (
       <ClassicHeader
         className={cn("has-sticky-header rounded-md   ", {
-          "ltr:xl:ml-[72px] rtl:xl:mr-[72px] ": collapsed,
+          "ltr:xl:ml-[96px] rtl:xl:mr-[96px] ": collapsed,
           "ltr:xl:ml-[272px] rtl:xl:mr-[272px] ": !collapsed,
 
           "sticky top-6": navbarType === "sticky",
         })}
       >
         <div className="xl:mx-20 mx-4">
-          <div className="w-full bg-card/90 backdrop-blur-lg md:px-6 px-[15px] py-3 rounded-md my-6 shadow-md border-b">
+          <div className="w-full bg-card md:px-6 px-[15px] py-3 rounded-md my-6 shadow-md border-b">
             <div className="flex justify-between items-center h-full relative">
               <VerticalHeader
                 handleOpenSearch={handleOpenSearch}
@@ -112,7 +110,7 @@ const Header = ({ handleOpenSearch, trans }: { handleOpenSearch: () => void; tra
           "sticky top-0": navbarType === "sticky",
         })}
       >
-        <div className="w-full bg-card/90 backdrop-blur-lg md:px-6 px-[15px] py-3 border-b">
+        <div className="w-full bg-card md:px-6 px-[15px] py-3 border-b">
           <div className="flex justify-between items-center h-full relative">
             <VerticalHeader
 
@@ -143,7 +141,7 @@ const Header = ({ handleOpenSearch, trans }: { handleOpenSearch: () => void; tra
             !collapsed && sidebarType !== "module",
         })}
       >
-        <div className="w-full bg-card/90 backdrop-blur-lg md:px-6 px-[15px] py-3 rounded-md my-6 shadow-md border-b">
+        <div className="w-full bg-card md:px-6 px-[15px] py-3 rounded-md my-6 shadow-md border-b">
           <div className="flex justify-between items-center h-full relative">
             <VerticalHeader
 
@@ -170,7 +168,7 @@ const Header = ({ handleOpenSearch, trans }: { handleOpenSearch: () => void; tra
         "sticky top-0": navbarType === "sticky",
       })}
     >
-      <div className="w-full bg-card/90 backdrop-blur-lg md:px-6 px-[15px] py-3 border-b">
+      <div className="w-full bg-card md:px-6 px-[15px] py-3 border-b">
         <div className="flex justify-between items-center h-full relative">
           <VerticalHeader
 

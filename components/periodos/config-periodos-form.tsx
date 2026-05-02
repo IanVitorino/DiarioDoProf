@@ -2,8 +2,6 @@
 
 import * as React from "react";
 import { useForm, Controller } from "react-hook-form";
-import Flatpickr from "react-flatpickr";
-import { Portuguese } from "flatpickr/dist/l10n/pt.js";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -11,34 +9,14 @@ import { Loader2, Save } from "lucide-react";
 import toast from "react-hot-toast";
 import { updatePeriodosVigencia } from "@/actions/periodos";
 import { bimestreNome } from "@/lib/turma-format";
+import { dbToIsoString } from "@/lib/dates";
+import { MaskedDatePicker } from "@/components/ui/masked-date-picker";
 
 interface Periodo {
   id: string;
   ordem: number;
   dataInicio: Date | null;
   dataFim: Date | null;
-}
-
-// DB armazena datas como UTC midnight (vindo de `new Date("YYYY-MM-DD")`).
-// Extraímos os componentes via UTC pra evitar drift por timezone local.
-function dbToIsoString(d: Date | null | undefined): string {
-  if (!d) return "";
-  const date = new Date(d);
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
-}
-
-// Converte string ISO "YYYY-MM-DD" pra Date em LOCAL midnight,
-// pra que o Flatpickr exiba a data correta no fuso do usuário.
-function isoToLocalDate(iso: string | undefined | null): Date | undefined {
-  if (!iso) return undefined;
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return undefined;
-  return new Date(y, m - 1, d);
-}
-
-// Flatpickr retorna Date em LOCAL midnight; extraímos componentes locais.
-function localToIsoString(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 interface FormBimestre {
@@ -54,9 +32,6 @@ interface Props {
   turmaId: string;
   periodos: Periodo[];
 }
-
-const inputClass =
-  "w-full bg-background border border-default-300 dark:border-default-700 rounded-md px-3 h-9 text-sm placeholder:text-accent-foreground/50 focus:outline-none focus:border-primary transition";
 
 export function ConfigPeriodosForm({ turmaId, periodos }: Props) {
   const [isPending, startTransition] = React.useTransition();
@@ -106,18 +81,10 @@ export function ConfigPeriodosForm({ turmaId, periodos }: Props) {
                 control={control}
                 name={`bimestres.${idx}.dataInicio`}
                 render={({ field }) => (
-                  <Flatpickr
-                    options={{
-                      dateFormat: "d/m/Y",
-                      locale: Portuguese,
-                      allowInput: true,
-                      defaultDate: isoToLocalDate(field.value),
-                    }}
-                    onChange={(dates) =>
-                      field.onChange(dates[0] ? localToIsoString(dates[0]) : "")
-                    }
-                    placeholder="dd/mm/aaaa"
-                    className={inputClass}
+                  <MaskedDatePicker
+                    id={`inicio-${p.id}`}
+                    value={field.value}
+                    onChange={field.onChange}
                   />
                 )}
               />
@@ -128,18 +95,10 @@ export function ConfigPeriodosForm({ turmaId, periodos }: Props) {
                 control={control}
                 name={`bimestres.${idx}.dataFim`}
                 render={({ field }) => (
-                  <Flatpickr
-                    options={{
-                      dateFormat: "d/m/Y",
-                      locale: Portuguese,
-                      allowInput: true,
-                      defaultDate: isoToLocalDate(field.value),
-                    }}
-                    onChange={(dates) =>
-                      field.onChange(dates[0] ? localToIsoString(dates[0]) : "")
-                    }
-                    placeholder="dd/mm/aaaa"
-                    className={inputClass}
+                  <MaskedDatePicker
+                    id={`fim-${p.id}`}
+                    value={field.value}
+                    onChange={field.onChange}
                   />
                 )}
               />

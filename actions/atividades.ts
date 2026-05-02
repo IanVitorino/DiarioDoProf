@@ -108,7 +108,10 @@ export async function updateAtividade(id: string, input: unknown) {
 
   const found = await prisma.atividade.findFirst({
     where: { id, professorId },
-    include: { periodo: { select: { turmaId: true } } },
+    include: {
+      periodo: { select: { turmaId: true, modoCalculo: true } },
+      notas: { select: { id: true, valor: true } },
+    },
   });
   if (!found) throw new Error("Atividade não encontrada");
 
@@ -120,6 +123,7 @@ export async function updateAtividade(id: string, input: unknown) {
       ordem: true,
       dataInicio: true,
       dataFim: true,
+      modoCalculo: true,
     },
   });
   if (!novoPeriodo) throw new Error("Período não encontrado");
@@ -132,15 +136,38 @@ export async function updateAtividade(id: string, input: unknown) {
   const dataParsed = parseData(data.data);
   validarDataDentroDoBimestre(dataParsed, novoPeriodo);
 
-  await prisma.atividade.update({
-    where: { id },
-    data: {
-      nome: data.nome,
-      valorMaximo: data.valorMaximo,
-      data: dataParsed,
-      periodoId: data.periodoId,
-    },
-  });
+  // Reescala notas existentes se o cap efetivo da atividade mudou.
+  // Cap depende do modo do período de origem/destino:
+  //   - MEDIA: cap = 10 (ignora valorMaximo)
+  //   - SOMA:  cap = valorMaximo da atividade
+  const capAntigo =
+    found.periodo.modoCalculo === "MEDIA" ? 10 : found.valorMaximo;
+  const capNovo =
+    novoPeriodo.modoCalculo === "MEDIA" ? 10 : data.valorMaximo;
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const updates =
+    capAntigo > 0 && capNovo > 0 && capAntigo !== capNovo
+      ? found.notas.map((n) =>
+          prisma.nota.update({
+            where: { id: n.id },
+            data: { valor: round2((n.valor / capAntigo) * capNovo) },
+          }),
+        )
+      : [];
+
+  await prisma.$transaction([
+    prisma.atividade.update({
+      where: { id },
+      data: {
+        nome: data.nome,
+        valorMaximo: data.valorMaximo,
+        data: dataParsed,
+        periodoId: data.periodoId,
+      },
+    }),
+    ...updates,
+  ]);
   revalidatePath(`/turmas/${found.periodo.turmaId}/atividades`);
 }
 

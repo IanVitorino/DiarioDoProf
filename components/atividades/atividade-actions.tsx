@@ -4,17 +4,11 @@ import * as React from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import Flatpickr from "react-flatpickr";
-import { Portuguese } from "flatpickr/dist/l10n/pt.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  dbDateToLocalDate,
-  dbToIsoString,
-  isoToLocalDate,
-  localToIsoString,
-} from "@/lib/dates";
+import { MaskedDatePicker } from "@/components/ui/masked-date-picker";
+import { dbDateToLocalDate, dbToIsoString } from "@/lib/dates";
 import {
   Dialog,
   DialogContent,
@@ -74,9 +68,6 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-const dateInputClass =
-  "w-full bg-background border border-default-300 dark:border-default-700 rounded-md px-3 h-9 text-sm placeholder:text-accent-foreground/50 focus:outline-none focus:border-primary transition";
-
 interface Props {
   atividade: Atividade;
   periodos: PeriodoOption[];
@@ -87,21 +78,24 @@ export function AtividadeActions({ atividade, periodos }: Props) {
   const [removeOpen, setRemoveOpen] = React.useState(false);
   const [isPending, startTransition] = React.useTransition();
 
+  const initialValues: FormData = {
+    nome: atividade.nome,
+    valorMaximo: atividade.valorMaximo,
+    periodoId: atividade.periodoId,
+    data: dbToIsoString(atividade.data),
+  };
+
   const {
     register,
     handleSubmit,
     setValue,
     watch,
     control,
+    reset,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      nome: atividade.nome,
-      valorMaximo: atividade.valorMaximo,
-      periodoId: atividade.periodoId,
-      data: dbToIsoString(atividade.data),
-    },
+    defaultValues: initialValues,
   });
 
   const periodoId = watch("periodoId");
@@ -162,7 +156,13 @@ export function AtividadeActions({ atividade, periodos }: Props) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog
+        open={editOpen}
+        onOpenChange={(o) => {
+          setEditOpen(o);
+          if (!o) reset(initialValues);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Editar atividade</DialogTitle>
@@ -181,21 +181,12 @@ export function AtividadeActions({ atividade, periodos }: Props) {
                 control={control}
                 name="data"
                 render={({ field }) => (
-                  <Flatpickr
-                    options={{
-                      dateFormat: "d/m/Y",
-                      locale: Portuguese,
-                      allowInput: true,
-                      static: true,
-                      defaultDate: isoToLocalDate(field.value),
-                      minDate,
-                      maxDate,
-                    }}
-                    onChange={(dates) =>
-                      field.onChange(dates[0] ? localToIsoString(dates[0]) : "")
-                    }
-                    placeholder="dd/mm/aaaa"
-                    className={dateInputClass}
+                  <MaskedDatePicker
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    staticPosition
+                    minDate={minDate}
+                    maxDate={maxDate}
                   />
                 )}
               />

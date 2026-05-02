@@ -1,18 +1,16 @@
 import { Card } from "@/components/ui/card";
 import { getMeuPerfil } from "@/actions/perfil";
 import { Mail, GraduationCap, User2 } from "lucide-react";
-import { AvatarUpload } from "@/components/perfil/avatar-upload";
+import { InitialsAvatar } from "@/components/ui/initials-avatar";
 
 export default async function PerfilPage() {
   const perfil = await getMeuPerfil();
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-default-900">Meu perfil</h1>
-
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-          <AvatarUpload initialUrl={perfil.avatarUrl} />
+          <InitialsAvatar name={perfil.nome} className="h-[120px] w-[120px] text-3xl" />
           <div className="flex-1 space-y-4 w-full">
             <div>
               <div className="text-xs uppercase tracking-wide text-default-500 mb-1 flex items-center gap-1.5">

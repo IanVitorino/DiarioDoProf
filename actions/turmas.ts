@@ -11,6 +11,8 @@ const turmaSchema = z.object({
   nivel: z.enum(["FUNDAMENTAL_I", "FUNDAMENTAL_II", "MEDIO"]),
   serie: z.string().min(1, "Série é obrigatória"),
   disciplina: z.string().min(1, "Disciplina é obrigatória"),
+  escola: z.string().min(1, "Escola é obrigatória").max(120),
+  turno: z.enum(["MATUTINO", "VESPERTINO", "NOTURNO"]),
   ano: z.coerce.number().int().min(2000).max(2100),
 });
 

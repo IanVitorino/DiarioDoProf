@@ -22,22 +22,49 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Plus } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Check, ChevronsUpDown, Loader2, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { createTurma } from "@/actions/turmas";
+import { DISCIPLINAS_POR_AREA } from "@/lib/disciplinas";
 
 const schema = z.object({
-  serie: z.string().min(1, "Série é obrigatória"),
-  turma: z.string().min(1, "Turma é obrigatória").max(10),
+  serie: z
+    .string()
+    .regex(/^[1-9]$/, "Série deve ser um número de 1 a 9"),
+  turma: z.string().regex(/^[A-Z]$/, "Turma deve ser uma letra de A a Z"),
   nivel: z.enum(["FUNDAMENTAL_I", "FUNDAMENTAL_II", "MEDIO"]),
   disciplina: z.string().min(1, "Disciplina é obrigatória"),
-  ano: z.coerce.number().int().min(2000).max(2100),
+  escola: z
+    .string()
+    .min(1, "Escola é obrigatória")
+    .max(120, "Máximo 120 caracteres"),
+  turno: z.enum(["MATUTINO", "VESPERTINO", "NOTURNO"], {
+    errorMap: () => ({ message: "Turno é obrigatório" }),
+  }),
+  ano: z
+    .string()
+    .regex(/^\d{4}$/, "Ano deve ter 4 dígitos"),
 });
 
 type FormData = z.infer<typeof schema>;
 
 export function NovaTurmaButton() {
   const [open, setOpen] = React.useState(false);
+  const [discOpen, setDiscOpen] = React.useState(false);
   const [isPending, startTransition] = React.useTransition();
 
   const {
@@ -54,11 +81,15 @@ export function NovaTurmaButton() {
       turma: "",
       nivel: "FUNDAMENTAL_II",
       disciplina: "",
-      ano: new Date().getFullYear(),
+      escola: "",
+      turno: "MATUTINO",
+      ano: String(new Date().getFullYear()),
     },
   });
 
   const nivel = watch("nivel");
+  const turno = watch("turno");
+  const disciplina = watch("disciplina");
 
   const onSubmit = (data: FormData) => {
     startTransition(async () => {
@@ -74,7 +105,13 @@ export function NovaTurmaButton() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) reset();
+      }}
+    >
       <DialogTrigger asChild>
         <Button>
           <Plus className="w-4 h-4 mr-2" />
@@ -92,11 +129,21 @@ export function NovaTurmaButton() {
               <div className="relative">
                 <Input
                   id="serie"
-                  type="number"
-                  min={1}
-                  {...register("serie")}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
                   placeholder="1"
                   className="pr-8"
+                  {...register("serie", {
+                    onChange: (e) => {
+                      const sanitized = e.target.value
+                        .replace(/[^1-9]/g, "")
+                        .slice(0, 1);
+                      if (sanitized !== e.target.value) {
+                        setValue("serie", sanitized);
+                      }
+                    },
+                  })}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-default-500 pointer-events-none select-none">
                   º
@@ -110,9 +157,20 @@ export function NovaTurmaButton() {
               <Label htmlFor="turma">Turma</Label>
               <Input
                 id="turma"
-                {...register("turma")}
                 placeholder="Ex: A"
-                maxLength={10}
+                maxLength={1}
+                className="uppercase"
+                {...register("turma", {
+                  onChange: (e) => {
+                    const sanitized = e.target.value
+                      .toUpperCase()
+                      .replace(/[^A-Z]/g, "")
+                      .slice(0, 1);
+                    if (sanitized !== e.target.value) {
+                      setValue("turma", sanitized);
+                    }
+                  },
+                })}
               />
               {errors.turma && (
                 <p className="text-destructive text-sm mt-1">{errors.turma.message}</p>
@@ -120,28 +178,64 @@ export function NovaTurmaButton() {
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="nivel">Ensino</Label>
-            <Select
-              value={nivel}
-              onValueChange={(v: "FUNDAMENTAL_I" | "FUNDAMENTAL_II" | "MEDIO") =>
-                setValue("nivel", v)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="FUNDAMENTAL_I">Fundamental I</SelectItem>
-                <SelectItem value="FUNDAMENTAL_II">Fundamental II</SelectItem>
-                <SelectItem value="MEDIO">Médio</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="nivel">Ensino</Label>
+              <Select
+                value={nivel}
+                onValueChange={(v: "FUNDAMENTAL_I" | "FUNDAMENTAL_II" | "MEDIO") =>
+                  setValue("nivel", v)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="FUNDAMENTAL_I">Fundamental I</SelectItem>
+                  <SelectItem value="FUNDAMENTAL_II">Fundamental II</SelectItem>
+                  <SelectItem value="MEDIO">Médio</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="turno">Turno</Label>
+              <Select
+                value={turno}
+                onValueChange={(v: "MATUTINO" | "VESPERTINO" | "NOTURNO") =>
+                  setValue("turno", v)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MATUTINO">Matutino</SelectItem>
+                  <SelectItem value="VESPERTINO">Vespertino</SelectItem>
+                  <SelectItem value="NOTURNO">Noturno</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div>
             <Label htmlFor="ano">Ano</Label>
-            <Input id="ano" type="number" {...register("ano")} />
+            <Input
+              id="ano"
+              type="text"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="2026"
+              {...register("ano", {
+                onChange: (e) => {
+                  const sanitized = e.target.value
+                    .replace(/\D/g, "")
+                    .slice(0, 4);
+                  if (sanitized !== e.target.value) {
+                    setValue("ano", sanitized);
+                  }
+                },
+              })}
+            />
             {errors.ano && (
               <p className="text-destructive text-sm mt-1">{errors.ano.message}</p>
             )}
@@ -149,13 +243,86 @@ export function NovaTurmaButton() {
 
           <div>
             <Label htmlFor="disciplina">Disciplina</Label>
-            <Input
-              id="disciplina"
-              {...register("disciplina")}
-              placeholder="Ex: Matemática"
-            />
+            <Popover open={discOpen} onOpenChange={setDiscOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={discOpen}
+                  className="w-full justify-between font-normal"
+                >
+                  <span className={cn(!disciplina && "text-default-500")}>
+                    {disciplina || "Selecione a disciplina"}
+                  </span>
+                  <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="p-0 w-[var(--radix-popover-trigger-width)] z-[10000]"
+                align="start"
+              >
+                <Command
+                  filter={(value, search) => {
+                    const stripDiacritics = (s: string) =>
+                      s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+                    return stripDiacritics(value).includes(
+                      stripDiacritics(search),
+                    )
+                      ? 1
+                      : 0;
+                  }}
+                >
+                  <CommandInput placeholder="Buscar disciplina..." />
+                  <CommandList
+                    className="max-h-72 overflow-y-auto"
+                    onWheel={(e) => e.stopPropagation()}
+                    onTouchMove={(e) => e.stopPropagation()}
+                  >
+                    <CommandEmpty>Nenhuma disciplina encontrada.</CommandEmpty>
+                    {DISCIPLINAS_POR_AREA.map((grupo) => (
+                      <CommandGroup key={grupo.area} heading={grupo.area}>
+                        {grupo.disciplinas.map((d) => (
+                          <CommandItem
+                            key={d}
+                            value={d}
+                            onSelect={() => {
+                              setValue("disciplina", d, {
+                                shouldValidate: true,
+                              });
+                              setDiscOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                disciplina === d ? "opacity-100" : "opacity-0",
+                              )}
+                            />
+                            {d}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    ))}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             {errors.disciplina && (
               <p className="text-destructive text-sm mt-1">{errors.disciplina.message}</p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="escola">Escola</Label>
+            <Input
+              id="escola"
+              {...register("escola")}
+              placeholder="Ex: EE Manuel Bandeira"
+              maxLength={120}
+            />
+            {errors.escola && (
+              <p className="text-destructive text-sm mt-1">{errors.escola.message}</p>
             )}
           </div>
 

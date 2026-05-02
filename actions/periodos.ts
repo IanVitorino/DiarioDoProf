@@ -17,14 +17,53 @@ export async function setModoCalculoPeriodo(
 
   const found = await prisma.periodo.findFirst({
     where: { id: periodoId, professorId },
-    select: { id: true, turmaId: true },
+    select: { id: true, turmaId: true, modoCalculo: true },
   });
   if (!found) throw new Error("Período não encontrado");
 
-  await prisma.periodo.update({
-    where: { id: periodoId },
-    data: { modoCalculo: data },
-  });
+  // Se modo realmente mudou, reescala as notas existentes proporcionalmente
+  // pra manter o desempenho do aluno coerente com o novo cap.
+  if (found.modoCalculo !== data) {
+    const atividades = await prisma.atividade.findMany({
+      where: { periodoId, professorId },
+      select: {
+        id: true,
+        valorMaximo: true,
+        notas: { select: { id: true, valor: true } },
+      },
+    });
+
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+
+    const updates = atividades.flatMap((a) => {
+      if (a.valorMaximo <= 0) return [];
+      return a.notas.map((n) => {
+        const novoValor =
+          data === "SOMA"
+            ? // MEDIA → SOMA: cap antigo era 10
+              round2((n.valor / 10) * a.valorMaximo)
+            : // SOMA → MEDIA: cap antigo era valorMaximo da atividade
+              round2((n.valor / a.valorMaximo) * 10);
+        return prisma.nota.update({
+          where: { id: n.id },
+          data: { valor: novoValor },
+        });
+      });
+    });
+
+    await prisma.$transaction([
+      prisma.periodo.update({
+        where: { id: periodoId },
+        data: { modoCalculo: data },
+      }),
+      ...updates,
+    ]);
+  } else {
+    await prisma.periodo.update({
+      where: { id: periodoId },
+      data: { modoCalculo: data },
+    });
+  }
 
   revalidatePath(`/turmas/${found.turmaId}/atividades`);
   revalidatePath(`/turmas/${found.turmaId}/periodos`);

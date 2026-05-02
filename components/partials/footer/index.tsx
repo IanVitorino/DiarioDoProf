@@ -27,8 +27,8 @@ const Footer = ({ handleOpenSearch }: { handleOpenSearch: () => void }) => {
     return (
       <div className="xl:mx-20 mx-6">
         <FooterLayout
-          className={cn(" rounded-md border", {
-            "ltr:xl:ml-[72px] rtl:xl:mr-[72px]": collapsed,
+          className={cn(" rounded-md border transition-[margin] duration-300 ease-in-out", {
+            "ltr:xl:ml-[96px] rtl:xl:mr-[96px]": collapsed,
             "ltr:xl:ml-[272px] rtl:xl:mr-[272px]": !collapsed,
             "sticky bottom-0": footerType === "sticky",
           })}

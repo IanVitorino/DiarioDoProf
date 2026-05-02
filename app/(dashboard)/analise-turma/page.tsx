@@ -23,11 +23,22 @@ import {
   ListItem,
   EmptyMessage,
 } from "@/components/analise/list-card";
-import { NIVEL_LABEL, bimestreNome } from "@/lib/turma-format";
+import { TurmaFilterBar } from "@/components/turmas/turma-filter-bar";
+import { NIVEL_LABEL, TURNO_LABEL, bimestreNome } from "@/lib/turma-format";
+import {
+  aplicarFiltros,
+  extrairFilterOptions,
+  type TurmaFiltros,
+} from "@/lib/turma-filters";
 
 interface SearchParams {
   turma?: string;
   bimestres?: string;
+  disciplina?: string;
+  nivel?: string;
+  ano?: string;
+  escola?: string;
+  turno?: string;
 }
 
 export default async function AnaliseTurmaPage({
@@ -39,14 +50,23 @@ export default async function AnaliseTurmaPage({
 
   if (!turmaId) {
     const turmas = await listTurmas();
+    const options = extrairFilterOptions(turmas);
+    const filtros: TurmaFiltros = {
+      disciplina: searchParams.disciplina,
+      nivel: searchParams.nivel,
+      ano: searchParams.ano,
+      escola: searchParams.escola,
+      turno: searchParams.turno,
+    };
+    const turmasFiltradas = aplicarFiltros(turmas, filtros);
+
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-default-900">Análise da turma</h1>
-          <p className="text-sm text-default-600 mt-1">
-            Selecione uma turma para ver o dashboard.
-          </p>
-        </div>
+        <p className="text-sm text-default-600">
+          Selecione uma turma para ver o dashboard.
+        </p>
+
+        {turmas.length > 0 && <TurmaFilterBar options={options} />}
 
         {turmas.length === 0 ? (
           <Card className="p-12 text-center">
@@ -61,9 +81,18 @@ export default async function AnaliseTurmaPage({
               .
             </p>
           </Card>
+        ) : turmasFiltradas.length === 0 ? (
+          <Card className="p-12 text-center">
+            <p className="text-default-700 mb-2 text-lg font-medium">
+              Nenhuma turma encontrada
+            </p>
+            <p className="text-sm text-default-500">
+              Ajuste os filtros acima para ver suas turmas.
+            </p>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {turmas.map((turma) => (
+            {turmasFiltradas.map((turma) => (
               <Link
                 href={`/analise-turma?turma=${turma.id}`}
                 key={turma.id}
@@ -86,7 +115,10 @@ export default async function AnaliseTurmaPage({
                     {turma.disciplina}
                   </p>
                   <p className="text-xs text-default-500">
-                    {NIVEL_LABEL[turma.nivel] ?? turma.nivel} · {turma.ano}
+                    {NIVEL_LABEL[turma.nivel] ?? turma.nivel}
+                    {turma.turno ? ` · ${TURNO_LABEL[turma.turno] ?? turma.turno}` : ""}
+                    {` · ${turma.ano}`}
+                    {turma.escola ? ` · ${turma.escola}` : ""}
                   </p>
                 </Card>
               </Link>

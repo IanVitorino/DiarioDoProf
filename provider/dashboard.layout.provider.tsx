@@ -9,7 +9,6 @@ import { useRouter, usePathname } from "next/navigation";
 import Footer from "@/components/partials/footer";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import ThemeCustomize from "@/components/partials/customizer/theme-customizer";
-import MobileSidebar from "@/components/partials/sidebar/mobile-sidebar";
 import HeaderSearch from "@/components/header-search";
 import { useMounted } from "@/hooks/use-mounted";
 import LayoutLoader from "@/components/layout-loader";
@@ -31,13 +30,13 @@ const DashBoardLayoutProvider = ({ children, trans }: { children: React.ReactNod
 
         <div
           className={cn("content-wrapper transition-[margin] duration-300 ease-in-out ", {
-            "ltr:xl:ml-[72px] rtl:xl:mr-[72px]": collapsed,
+            "ltr:xl:ml-[96px] rtl:xl:mr-[96px]": collapsed,
             "ltr:xl:ml-[272px] rtl:xl:mr-[272px]": !collapsed,
           })}
         >
           <div
             className={cn(
-              "pt-6 pb-8 px-4  page-min-height-semibox ",
+              "pt-1 pb-8 px-4  page-min-height-semibox ",
 
             )}
           >
@@ -189,7 +188,6 @@ const LayoutWrapper = ({ children, isMobile, setOpen, open, location, trans }: {
         <main>{children}</main>
       </motion.div>
 
-      <MobileSidebar trans={trans} className="left-[300px]" />
       <HeaderSearch open={open} setOpen={setOpen} />
     </>
   );

@@ -9,9 +9,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@iconify/react";
-import Image from "next/image";
 import Link from "next/link";
-import avatarPlaceholder from "@/public/images/avatar/avatar-5.jpg";
+import { InitialsAvatar } from "@/components/ui/initials-avatar";
 
 const ProfileInfo = () => {
   const { data: session, status } = useSession();
@@ -19,45 +18,24 @@ const ProfileInfo = () => {
   if (status === "loading" || !session?.user) {
     return (
       <div className="flex items-center">
-        <Image
-          src={avatarPlaceholder}
-          alt=""
-          width={36}
-          height={36}
-          className="rounded-full opacity-60"
-        />
+        <div className="h-9 w-9 rounded-full bg-primary/30 animate-pulse" />
       </div>
     );
   }
 
   const nome = session.user.name ?? "Professor";
   const email = session.user.email ?? "";
-  const avatarSrc = session.user.image || avatarPlaceholder;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild className="cursor-pointer">
         <div className="flex items-center">
-          <Image
-            src={avatarSrc}
-            alt={nome}
-            width={36}
-            height={36}
-            className="rounded-full h-9 w-9 object-cover"
-            unoptimized={typeof avatarSrc === "string"}
-          />
+          <InitialsAvatar name={nome} className="h-9 w-9 text-sm" />
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-64 p-0" align="end">
         <DropdownMenuLabel className="flex gap-3 items-center p-3">
-          <Image
-            src={avatarSrc}
-            alt={nome}
-            width={40}
-            height={40}
-            className="rounded-full h-10 w-10 object-cover"
-            unoptimized={typeof avatarSrc === "string"}
-          />
+          <InitialsAvatar name={nome} className="h-10 w-10 text-sm" />
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-default-800 truncate">
               {nome}

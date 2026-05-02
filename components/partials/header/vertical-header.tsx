@@ -1,10 +1,8 @@
 import React from "react";
 import { useSidebar, useThemeStore } from "@/store";
 import { cn } from "@/lib/utils";
-import { Icon } from "@iconify/react";
-import { SiteLogo } from "@/components/svg";
-import Link from "next/link";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import MobileMenuHandler from "./mobile-menu-handler";
 
 const MenuBar = ({ collapsed, setCollapsed }: { collapsed: boolean, setCollapsed: (value: boolean) => void; }) => {
   return (
@@ -60,29 +58,7 @@ const VerticalHeader: React.FC<VerticalHeaderProps> = ({ handleOpenSearch }) => 
   const { collapsed, setCollapsed, subMenu, sidebarType } = useSidebar();
   const { layout } = useThemeStore();
   const isDesktop = useMediaQuery("(min-width: 1280px)");
-  const isMobile = useMediaQuery("(min-width: 768px)");
-  let LogoContent = null;
   let menuBarContent = null;
-
-  const MainLogo = (
-    <Link href="/dashboard" className=" text-primary ">
-      <SiteLogo className="h-7 w-7" />
-    </Link>
-  );
-  if (layout === "semibox" && !isDesktop) {
-    LogoContent = MainLogo;
-  }
-  if (
-    layout === "vertical" &&
-    !isDesktop &&
-    isMobile &&
-    sidebarType === "module"
-  ) {
-    LogoContent = MainLogo;
-  }
-  if (layout === "vertical" && !isDesktop && sidebarType !== "module") {
-    LogoContent = MainLogo;
-  }
 
   // menu bar content condition
   if (isDesktop && sidebarType !== "module") {
@@ -101,10 +77,14 @@ const VerticalHeader: React.FC<VerticalHeaderProps> = ({ handleOpenSearch }) => 
   if (subMenu && isDesktop) {
     menuBarContent = null;
   }
+
+  // No mobile/tablet sem layout module, mostra o hamburger à esquerda
+  const showMobileHamburger = !isDesktop && sidebarType !== "module";
+
   return (
     <>
       <div className="flex items-center md:gap-6 gap-3">
-        {LogoContent}
+        {showMobileHamburger && <MobileMenuHandler />}
         {menuBarContent}
       </div>
     </>

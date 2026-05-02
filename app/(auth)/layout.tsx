@@ -32,14 +32,14 @@ export default function AuthLayout({
 
             {/* Tagline + features */}
             <div className="w-full max-w-sm mt-1 lg:mt-2">
-              <h3 className="text-lg lg:text-xl font-bold text-default-900 mb-4 text-center lg:text-left">
+              <h3 className="text-lg lg:text-xl font-bold text-slate-900 mb-4 text-center lg:text-left">
                 Acompanhe seus alunos com clareza.
               </h3>
               <ul className="space-y-2.5">
                 {features.map((f) => (
                   <li
                     key={f}
-                    className="flex items-start gap-3 text-sm text-default-700"
+                    className="flex items-start gap-3 text-sm text-slate-700"
                   >
                     <CheckCircle2 className="w-5 h-5 text-[#1d4ed8] shrink-0 mt-0.5" />
                     <span>{f}</span>

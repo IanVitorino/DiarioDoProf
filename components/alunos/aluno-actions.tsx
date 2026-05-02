@@ -39,8 +39,13 @@ interface Aluno {
   nome: string;
 }
 
+const NOME_REGEX = /^[A-Za-zÀ-ÿ\s'-]+$/;
+
 const schema = z.object({
-  nome: z.string().min(1, "Nome é obrigatório"),
+  nome: z
+    .string()
+    .min(1, "Nome é obrigatório")
+    .regex(NOME_REGEX, "Nome só pode conter letras"),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -53,6 +58,8 @@ export function AlunoActions({ aluno }: { aluno: Aluno }) {
   const {
     register,
     handleSubmit,
+    setValue,
+    reset,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -108,7 +115,13 @@ export function AlunoActions({ aluno }: { aluno: Aluno }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog
+        open={editOpen}
+        onOpenChange={(o) => {
+          setEditOpen(o);
+          if (!o) reset({ nome: aluno.nome });
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Editar aluno</DialogTitle>
@@ -116,7 +129,20 @@ export function AlunoActions({ aluno }: { aluno: Aluno }) {
           <form onSubmit={handleSubmit(onUpdate)} className="space-y-4">
             <div>
               <Label htmlFor={`nome-${aluno.id}`}>Nome</Label>
-              <Input id={`nome-${aluno.id}`} {...register("nome")} />
+              <Input
+                id={`nome-${aluno.id}`}
+                {...register("nome", {
+                  onChange: (e) => {
+                    const sanitized = e.target.value.replace(
+                      /[^A-Za-zÀ-ÿ\s'-]/g,
+                      "",
+                    );
+                    if (sanitized !== e.target.value) {
+                      setValue("nome", sanitized);
+                    }
+                  },
+                })}
+              />
               {errors.nome && (
                 <p className="text-destructive text-sm mt-1">{errors.nome.message}</p>
               )}

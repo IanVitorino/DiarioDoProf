@@ -5,6 +5,14 @@ export const NIVEL_LABEL: Record<string, string> = {
   MEDIO: "Médio",
 };
 
+export const TURNO_LABEL: Record<string, string> = {
+  MATUTINO: "Matutino",
+  VESPERTINO: "Vespertino",
+  NOTURNO: "Noturno",
+};
+
+export const TURNOS = ["MATUTINO", "VESPERTINO", "NOTURNO"] as const;
+
 export function bimestreNome(ordem: number) {
   return `${ordem}º Bimestre`;
 }

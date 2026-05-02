@@ -19,8 +19,13 @@ import { Loader2, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import { createAluno } from "@/actions/alunos";
 
+const NOME_REGEX = /^[A-Za-zÀ-ÿ\s'-]+$/;
+
 const schema = z.object({
-  nome: z.string().min(1, "Nome é obrigatório"),
+  nome: z
+    .string()
+    .min(1, "Nome é obrigatório")
+    .regex(NOME_REGEX, "Nome só pode conter letras"),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -33,6 +38,7 @@ export function NovoAlunoButton({ turmaId }: { turmaId: string }) {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -53,7 +59,13 @@ export function NovoAlunoButton({ turmaId }: { turmaId: string }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) reset();
+      }}
+    >
       <DialogTrigger asChild>
         <Button>
           <Plus className="w-4 h-4 mr-2" />
@@ -67,7 +79,21 @@ export function NovoAlunoButton({ turmaId }: { turmaId: string }) {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <Label htmlFor="nome">Nome</Label>
-            <Input id="nome" {...register("nome")} placeholder="Ex: Maria Silva" />
+            <Input
+              id="nome"
+              placeholder="Ex: Maria Silva"
+              {...register("nome", {
+                onChange: (e) => {
+                  const sanitized = e.target.value.replace(
+                    /[^A-Za-zÀ-ÿ\s'-]/g,
+                    "",
+                  );
+                  if (sanitized !== e.target.value) {
+                    setValue("nome", sanitized);
+                  }
+                },
+              })}
+            />
             {errors.nome && (
               <p className="text-destructive text-sm mt-1">{errors.nome.message}</p>
             )}

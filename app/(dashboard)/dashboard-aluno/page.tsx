@@ -43,18 +43,17 @@ export default async function DashboardAlunoPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-default-900">Dashboard aluno</h1>
-        <p className="text-sm text-default-600 mt-1">
-          Visão completa de desempenho de um aluno específico.
-        </p>
-      </div>
+      <p className="text-sm text-default-600">
+        Visão completa de desempenho de um aluno específico.
+      </p>
 
       <TurmaAlunoFiltros
         turmas={turmas.map((t) => ({
           id: t.id,
           nome: t.nome,
           disciplina: t.disciplina,
+          serie: t.serie,
+          escola: t.escola,
         }))}
         alunos={alunos}
         turmaId={turmaId}

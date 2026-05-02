@@ -5,8 +5,6 @@ import Link from "next/link";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import Flatpickr from "react-flatpickr";
-import { Portuguese } from "flatpickr/dist/l10n/pt.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +19,8 @@ import {
 import { ArrowRight, CalendarX2, Loader2, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import { createAtividade } from "@/actions/atividades";
-import { dbDateToLocalDate, isoToLocalDate, localToIsoString } from "@/lib/dates";
+import { dbDateToLocalDate } from "@/lib/dates";
+import { MaskedDatePicker } from "@/components/ui/masked-date-picker";
 
 const schema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
@@ -39,9 +38,6 @@ interface Props {
   dataFim: Date | null;
   turmaId: string;
 }
-
-const dateInputClass =
-  "w-full bg-background border border-default-300 dark:border-default-700 rounded-md px-3 h-9 text-sm placeholder:text-accent-foreground/50 focus:outline-none focus:border-primary transition";
 
 export function NovaAtividadeButton({
   periodoId,
@@ -86,7 +82,13 @@ export function NovaAtividadeButton({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) reset();
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
           <Plus className="w-4 h-4 mr-2" />
@@ -124,21 +126,12 @@ export function NovaAtividadeButton({
                   control={control}
                   name="data"
                   render={({ field }) => (
-                    <Flatpickr
-                      options={{
-                        dateFormat: "d/m/Y",
-                        locale: Portuguese,
-                        allowInput: true,
-                        static: true,
-                        defaultDate: isoToLocalDate(field.value),
-                        minDate: dbDateToLocalDate(dataInicio),
-                        maxDate: dbDateToLocalDate(dataFim),
-                      }}
-                      onChange={(dates) =>
-                        field.onChange(dates[0] ? localToIsoString(dates[0]) : "")
-                      }
-                      placeholder="dd/mm/aaaa"
-                      className={dateInputClass}
+                    <MaskedDatePicker
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      staticPosition
+                      minDate={dbDateToLocalDate(dataInicio)}
+                      maxDate={dbDateToLocalDate(dataFim)}
                     />
                   )}
                 />
