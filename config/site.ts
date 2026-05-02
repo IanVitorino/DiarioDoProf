@@ -2,7 +2,7 @@
 
 
 export const siteConfig = {
-  name: "DashTail Next js Admin Template",
+  name: "Diário Do Prof",
   description: null,
   theme: "violet",
   layout: "semibox",

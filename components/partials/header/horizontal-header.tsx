@@ -6,15 +6,8 @@ const horizontalHeader = ({ handleOpenSearch }: { handleOpenSearch: () => void; 
   return (
     <div className="flex items-center lg:gap-12 gap-3 ">
       <div>
-        <Link
-          href="/dashboard"
-          className=" text-primary flex items-center gap-2"
-        >
-          <SiteLogo className="h-7 w-7" />
-          <span className=" text-xl font-semibold lg:inline-block hidden">
-            {" "}
-            DashTail
-          </span>
+        <Link href="/" className="flex items-center">
+          <SiteLogo variant="full" className="h-8 w-auto" />
         </Link>
       </div>
       <button
