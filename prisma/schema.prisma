@@ -32,6 +32,7 @@ model Professor {
   email        String   @unique
   passwordHash String
   nome         String
+  avatarUrl    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

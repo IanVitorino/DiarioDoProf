@@ -50,8 +50,15 @@ export const useThemeStore = create<ThemeStoreState>()(
       setRtl: (value) => set({ isRtl: value }),
         
       }),
-      { name: "theme-store",
-      storage: createJSONStorage(() => localStorage), },
+      {
+        name: "theme-store",
+        storage: createJSONStorage(() => localStorage),
+        version: 2,
+        migrate: (persistedState: any) => ({
+          ...persistedState,
+          theme: siteConfig.theme,
+        }),
+      },
     ),
 )
 

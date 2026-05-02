@@ -42,3 +42,7 @@ tsconfig.tsbuildinfo
 /.contentlayer/
 
 /lib/generated/prisma
+
+# user uploads (manter só o .gitkeep das pastas)
+/public/uploads/avatars/*
+!/public/uploads/avatars/.gitkeep

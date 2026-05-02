@@ -12,10 +12,20 @@ import fullLogoWhite from "@/public/logo/Full_logo_white.png";
 
 interface Props {
   variant?: "icon" | "full";
+  /**
+   * "auto" (default): adapta ao tema do sistema.
+   * "dark": força a versão pra fundo escuro (cores claras).
+   * "light": força a versão pra fundo claro (cores escuras).
+   */
+  mode?: "auto" | "dark" | "light";
   className?: string;
 }
 
-export function SiteLogo({ variant = "icon", className }: Props) {
+export function SiteLogo({
+  variant = "icon",
+  mode = "auto",
+  className,
+}: Props) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
@@ -23,14 +33,19 @@ export function SiteLogo({ variant = "icon", className }: Props) {
     setMounted(true);
   }, []);
 
-  const isDark = mounted && resolvedTheme === "dark";
+  const isDarkBg =
+    mode === "dark"
+      ? true
+      : mode === "light"
+      ? false
+      : mounted && resolvedTheme === "dark";
 
   const src =
     variant === "full"
-      ? isDark
+      ? isDarkBg
         ? fullLogoDark
         : fullLogoWhite
-      : isDark
+      : isDarkBg
       ? logoDark
       : logoWhite;
 

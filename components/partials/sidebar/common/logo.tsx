@@ -9,7 +9,13 @@ const SidebarLogo = ({ hovered }: { hovered?: boolean }) => {
     <div className="px-4 py-4 ">
       <div className=" flex items-center">
         <div className="flex flex-1 items-center gap-x-3">
-          <SiteLogo className="h-16 w-16 shrink-0" />
+          <div
+            className={`shrink-0 flex items-center justify-center transition-[height,width,margin] duration-300 ease-in-out ${
+              showText ? "h-16 w-16" : "h-10 w-10 mx-auto"
+            }`}
+          >
+            <SiteLogo className="h-full w-full" />
+          </div>
           {showText && (
             <span className="text-xl font-semibold text-default-900 dark:text-white truncate">
               Diário Do Prof

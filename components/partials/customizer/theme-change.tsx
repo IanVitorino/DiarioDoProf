@@ -37,6 +37,7 @@ const ThemeChange = () => {
       </div>
       <div className=" flex flex-wrap ">
         {[
+          "teal",
           "zinc",
           "slate",
           "stone",
@@ -45,6 +46,7 @@ const ThemeChange = () => {
           "red",
           "rose",
           "orange",
+          "green",
           "blue",
           "yellow",
           "violet",

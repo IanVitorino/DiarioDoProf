@@ -37,15 +37,23 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
+      }
+      if (token.id && (user || trigger === "update")) {
+        const fresh = await prisma.professor.findUnique({
+          where: { id: token.id as string },
+          select: { avatarUrl: true },
+        });
+        token.picture = fresh?.avatarUrl ?? null;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.id) {
         (session.user as { id?: string }).id = token.id as string;
+        session.user.image = (token.picture as string | null | undefined) ?? null;
       }
       return session;
     },

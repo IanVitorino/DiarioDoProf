@@ -30,7 +30,7 @@ const DashBoardLayoutProvider = ({ children, trans }: { children: React.ReactNod
         <Sidebar trans={trans} />
 
         <div
-          className={cn("content-wrapper transition-all duration-150 ", {
+          className={cn("content-wrapper transition-[margin] duration-300 ease-in-out ", {
             "ltr:xl:ml-[72px] rtl:xl:mr-[72px]": collapsed,
             "ltr:xl:ml-[272px] rtl:xl:mr-[272px]": !collapsed,
           })}
@@ -64,7 +64,7 @@ const DashBoardLayoutProvider = ({ children, trans }: { children: React.ReactNod
       <>
         <Header handleOpenSearch={() => setOpen(true)} trans={trans} />
 
-        <div className={cn("content-wrapper transition-all duration-150 ")}>
+        <div className={cn("content-wrapper transition-[margin] duration-300 ease-in-out ")}>
           <div
             className={cn(
               "  pt-6 px-6 pb-8  page-min-height-horizontal ",
@@ -95,7 +95,7 @@ const DashBoardLayoutProvider = ({ children, trans }: { children: React.ReactNod
         <Sidebar trans={trans} />
 
         <div
-          className={cn("content-wrapper transition-all duration-150 ", {
+          className={cn("content-wrapper transition-[margin] duration-300 ease-in-out ", {
             "ltr:xl:ml-[248px] rtl:xl:mr-[248px] ": !collapsed,
             "ltr:xl:ml-[72px] rtl:xl:mr-[72px]": collapsed,
           })}
@@ -128,7 +128,7 @@ const DashBoardLayoutProvider = ({ children, trans }: { children: React.ReactNod
       <Sidebar trans={trans} />
 
       <div
-        className={cn("content-wrapper transition-all duration-150 ", {
+        className={cn("content-wrapper transition-[margin] duration-300 ease-in-out ", {
           "ltr:xl:ml-[300px] rtl:xl:mr-[300px]": !collapsed,
           "ltr:xl:ml-[72px] rtl:xl:mr-[72px]": collapsed,
         })}

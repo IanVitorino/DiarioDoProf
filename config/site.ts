@@ -4,7 +4,7 @@
 export const siteConfig = {
   name: "Diário Do Prof",
   description: null,
-  theme: "violet",
+  theme: "teal",
   layout: "semibox",
   // semibox, horizontal, vertical
   hideSideBar: false,

@@ -1,6 +1,4 @@
-import {
-  DashBoard,
-} from "@/components/svg";
+import { Users, ClipboardList, BarChart3, UserCircle } from "lucide-react";
 
 
 export interface MenuItemProps {
@@ -17,25 +15,25 @@ export interface MenuItemProps {
 
 export const menusConfig = {
   mainNav: [
-    { title: "Turmas", icon: DashBoard, href: "/turmas" },
-    { title: "Notas", icon: DashBoard, href: "/notas" },
-    { title: "Análise da turma", icon: DashBoard, href: "/analise-turma" },
-    { title: "Dashboard aluno", icon: DashBoard, href: "/dashboard-aluno" },
+    { title: "Turmas", icon: Users, href: "/turmas" },
+    { title: "Notas", icon: ClipboardList, href: "/notas" },
+    { title: "Análise da turma", icon: BarChart3, href: "/analise-turma" },
+    { title: "Dashboard aluno", icon: UserCircle, href: "/dashboard-aluno" },
   ] as MenuItemProps[],
   sidebarNav: {
     modern: [
-      { title: "Turmas", icon: DashBoard, href: "/turmas" },
-      { title: "Notas", icon: DashBoard, href: "/notas" },
-      { title: "Análise da turma", icon: DashBoard, href: "/analise-turma" },
-      { title: "Dashboard aluno", icon: DashBoard, href: "/dashboard-aluno" },
+      { title: "Turmas", icon: Users, href: "/turmas" },
+      { title: "Notas", icon: ClipboardList, href: "/notas" },
+      { title: "Análise da turma", icon: BarChart3, href: "/analise-turma" },
+      { title: "Dashboard aluno", icon: UserCircle, href: "/dashboard-aluno" },
     ] as MenuItemProps[],
     classic: [
       { isHeader: true, title: "Cadastros" },
-      { title: "Turmas", icon: DashBoard, href: "/turmas" },
+      { title: "Turmas", icon: Users, href: "/turmas" },
+      { title: "Notas", icon: ClipboardList, href: "/notas" },
       { isHeader: true, title: "Dados" },
-      { title: "Notas", icon: DashBoard, href: "/notas" },
-      { title: "Análise da turma", icon: DashBoard, href: "/analise-turma" },
-      { title: "Dashboard aluno", icon: DashBoard, href: "/dashboard-aluno" },
+      { title: "Análise da turma", icon: BarChart3, href: "/analise-turma" },
+      { title: "Dashboard aluno", icon: UserCircle, href: "/dashboard-aluno" },
     ] as MenuItemProps[],
   },
 };

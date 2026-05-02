@@ -6,9 +6,8 @@ import { useSidebar, useThemeStore } from "@/store";
 import ProfileInfo from "./profile-info";
 import VerticalHeader from "./vertical-header";
 import HorizontalHeader from "./horizontal-header";
-import Inbox from "./inbox";
 import HorizontalMenu from "./horizontal-menu";
-import NotificationMessage from "./notification-message";
+import { PageTitle } from "./page-title";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
 import MobileMenuHandler from "./mobile-menu-handler";
@@ -21,8 +20,6 @@ const NavTools = ({ isDesktop, isMobile, sidebarType }: { isDesktop: boolean; is
       {isDesktop && <FullScreen />}
 
       <ThemeButton />
-      <Inbox />
-      <NotificationMessage />
 
       <div className="ltr:pl-2 rtl:pr-2">
         <ProfileInfo />
@@ -56,8 +53,9 @@ const Header = ({ handleOpenSearch, trans }: { handleOpenSearch: () => void; tra
         })}
       >
         <div className="w-full bg-card/90 backdrop-blur-lg md:px-6 px-[15px] py-3 border-b">
-          <div className="flex justify-between items-center h-full">
+          <div className="flex justify-between items-center h-full relative">
             <HorizontalHeader handleOpenSearch={handleOpenSearch} />
+            <PageTitle />
             <NavTools
               isDesktop={isDesktop}
               isMobile={isMobile}
@@ -85,10 +83,11 @@ const Header = ({ handleOpenSearch, trans }: { handleOpenSearch: () => void; tra
       >
         <div className="xl:mx-20 mx-4">
           <div className="w-full bg-card/90 backdrop-blur-lg md:px-6 px-[15px] py-3 rounded-md my-6 shadow-md border-b">
-            <div className="flex justify-between items-center h-full">
+            <div className="flex justify-between items-center h-full relative">
               <VerticalHeader
                 handleOpenSearch={handleOpenSearch}
               />
+              <PageTitle />
               <NavTools
                 isDesktop={isDesktop}
                 isMobile={isMobile}
@@ -114,11 +113,12 @@ const Header = ({ handleOpenSearch, trans }: { handleOpenSearch: () => void; tra
         })}
       >
         <div className="w-full bg-card/90 backdrop-blur-lg md:px-6 px-[15px] py-3 border-b">
-          <div className="flex justify-between items-center h-full">
+          <div className="flex justify-between items-center h-full relative">
             <VerticalHeader
 
               handleOpenSearch={handleOpenSearch}
             />
+            <PageTitle />
             <NavTools
               isDesktop={isDesktop}
               isMobile={isMobile}
@@ -144,11 +144,12 @@ const Header = ({ handleOpenSearch, trans }: { handleOpenSearch: () => void; tra
         })}
       >
         <div className="w-full bg-card/90 backdrop-blur-lg md:px-6 px-[15px] py-3 rounded-md my-6 shadow-md border-b">
-          <div className="flex justify-between items-center h-full">
+          <div className="flex justify-between items-center h-full relative">
             <VerticalHeader
 
               handleOpenSearch={handleOpenSearch}
             />
+            <PageTitle />
             <NavTools
               isDesktop={isDesktop}
               isMobile={isMobile}
@@ -170,11 +171,12 @@ const Header = ({ handleOpenSearch, trans }: { handleOpenSearch: () => void; tra
       })}
     >
       <div className="w-full bg-card/90 backdrop-blur-lg md:px-6 px-[15px] py-3 border-b">
-        <div className="flex justify-between items-center h-full">
+        <div className="flex justify-between items-center h-full relative">
           <VerticalHeader
 
             handleOpenSearch={handleOpenSearch}
           />
+          <PageTitle />
           <NavTools
             isDesktop={isDesktop}
             isMobile={isMobile}

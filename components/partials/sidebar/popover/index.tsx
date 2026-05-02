@@ -67,7 +67,7 @@ const PopoverSidebar = ({ trans }: { trans: string }) => {
 
   return (
     <div
-      className={cn("fixed  top-0  border-r  ", {
+      className={cn("fixed  top-0  border-r  transition-[width] duration-300 ease-in-out", {
         "w-[248px]": !collapsed,
         "w-[72px]": collapsed,
         "m-6 bottom-0   bg-card rounded-md": layout === "semibox",

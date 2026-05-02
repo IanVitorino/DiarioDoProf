@@ -54,7 +54,9 @@ export function AtividadesTable({ pontos }: Props) {
                   {bimestreNome(p.bimestre)}
                 </TableCell>
                 <TableCell className="text-center text-default-700">
-                  {p.temNota ? `${p.valor} / ${p.valorMaximo}` : "—"}
+                  {p.temNota
+                    ? `${p.valor} / ${p.modoCalculo === "MEDIA" ? 10 : p.valorMaximo}`
+                    : "—"}
                 </TableCell>
                 <TableCell className="text-center">
                   <span
