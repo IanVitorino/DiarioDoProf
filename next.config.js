@@ -49,6 +49,9 @@ const nextConfig = {
       },
     ],
   },
+  experimental: {
+    serverComponentsExternalPackages: ["@vercel/blob"],
+  },
 };
 
 
