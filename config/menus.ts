@@ -4,6 +4,7 @@ import {
   BarChart3,
   UserCircle,
   Activity,
+  HelpCircle,
 } from "lucide-react";
 
 
@@ -41,6 +42,8 @@ export const menusConfig = {
       { title: "Análise da turma", icon: BarChart3, href: "/analise-turma" },
       { title: "Dashboard aluno", icon: UserCircle, href: "/dashboard-aluno" },
       { title: "Dashboard atividades", icon: Activity, href: "/dashboard-atividades" },
+      { isHeader: true, title: "Ajuda" },
+      { title: "Central de ajuda", icon: HelpCircle, href: "/ajuda" },
     ] as MenuItemProps[],
   },
 };

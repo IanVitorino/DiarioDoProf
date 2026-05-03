@@ -9,6 +9,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/dashboard-atividades")) return "Dashboard atividades";
   if (pathname.startsWith("/dashboard-aluno")) return "Dashboard aluno";
   if (pathname.startsWith("/perfil")) return "Meu perfil";
+  if (pathname.startsWith("/ajuda")) return "Central de ajuda";
   return "";
 }
 

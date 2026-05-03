@@ -25,11 +25,17 @@ const Footer = ({ handleOpenSearch }: { handleOpenSearch: () => void }) => {
 
   if (layout === "semibox") {
     return (
-      <div className="xl:mx-20 mx-6">
-        <FooterLayout
-          className={cn(" rounded-md border transition-[margin] duration-300 ease-in-out", {
+      <div
+        className={cn(
+          "transition-[margin] duration-300 ease-in-out",
+          {
             "ltr:xl:ml-[96px] rtl:xl:mr-[96px]": collapsed,
             "ltr:xl:ml-[272px] rtl:xl:mr-[272px]": !collapsed,
+          },
+        )}
+      >
+        <FooterLayout
+          className={cn("px-4 xl:px-[72px]", {
             "sticky bottom-0": footerType === "sticky",
           })}
         >

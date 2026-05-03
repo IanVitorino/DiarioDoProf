@@ -291,6 +291,16 @@ function ListView({
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
+                        {g.notaGrupo != null && (
+                          <Badge
+                            color="success"
+                            variant="soft"
+                            className="text-xs font-medium"
+                            title="Nota do grupo"
+                          >
+                            {g.notaGrupo}
+                          </Badge>
+                        )}
                         <Badge
                           variant="outline"
                           className="text-xs font-normal text-default-600"

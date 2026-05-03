@@ -1,7 +1,9 @@
 import { listPeriodosComAtividades } from "@/actions/atividades";
 import { listAlunosByTurma } from "@/actions/alunos";
 import { getTurma } from "@/actions/turmas";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { User, Users } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -82,6 +84,7 @@ export default async function AtividadesTabPage({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
+                      <TableHead className="w-32">Tipo</TableHead>
                       <TableHead className="w-32">Data</TableHead>
                       <TableHead className="w-32">
                         {modo === "SOMA" ? "Peso" : "Valor máximo"}
@@ -94,6 +97,26 @@ export default async function AtividadesTabPage({
                     {periodo.atividades.map((atividade) => (
                       <TableRow key={atividade.id}>
                         <TableCell className="font-medium">{atividade.nome}</TableCell>
+                        <TableCell>
+                          {atividade.tipo === "GRUPO" ? (
+                            <Badge
+                              color="success"
+                              variant="soft"
+                              className="text-xs font-normal"
+                            >
+                              <Users className="w-3 h-3 mr-1" />
+                              Em grupo
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-normal text-default-600"
+                            >
+                              <User className="w-3 h-3 mr-1" />
+                              Individual
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="text-default-600">
                           {formatBrazilDate(atividade.data)}
                         </TableCell>

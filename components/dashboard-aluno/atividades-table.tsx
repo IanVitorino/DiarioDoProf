@@ -36,21 +36,23 @@ export function AtividadesTable({ pontos }: Props) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-28">Data</TableHead>
+              <TableHead className="w-28 hidden md:table-cell">Data</TableHead>
               <TableHead>Atividade</TableHead>
-              <TableHead className="w-28">Bimestre</TableHead>
+              <TableHead className="w-28 hidden md:table-cell">Bimestre</TableHead>
               <TableHead className="w-32 text-center">Nota bruta</TableHead>
-              <TableHead className="w-28 text-center">Equiv. /10</TableHead>
+              <TableHead className="w-28 text-center hidden md:table-cell">
+                Equiv. /10
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {pontos.map((p) => (
               <TableRow key={p.atividadeId}>
-                <TableCell className="text-default-600">
+                <TableCell className="text-default-600 hidden md:table-cell">
                   {formatBrazilDate(p.data)}
                 </TableCell>
                 <TableCell className="font-medium">{p.nome}</TableCell>
-                <TableCell className="text-default-600">
+                <TableCell className="text-default-600 hidden md:table-cell">
                   {bimestreNome(p.bimestre)}
                 </TableCell>
                 <TableCell className="text-center text-default-700">
@@ -58,7 +60,7 @@ export function AtividadesTable({ pontos }: Props) {
                     ? `${p.valor} / ${p.modoCalculo === "MEDIA" ? 10 : p.valorMaximo}`
                     : "—"}
                 </TableCell>
-                <TableCell className="text-center">
+                <TableCell className="text-center hidden md:table-cell">
                   <span
                     className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${pillClass(p.valorNormalizado, p.temNota)}`}
                   >
