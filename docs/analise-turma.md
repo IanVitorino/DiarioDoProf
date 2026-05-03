@@ -2,90 +2,89 @@
 
 Cobre a tela `/analise-turma` — dashboard analítico de uma turma como um todo.
 
-> Última atualização: 2026-05-02
+> Última atualização: 2026-05-03
 
 ---
 
 ## 1. Visão geral
 
 ```
-/analise-turma → seleciona Turma → seleciona quais bimestres entram (multi-select) → dashboard
+/analise-turma → escolhe Turma (cards filtráveis) → escolhe quais bimestres → dashboard
 ```
 
-Visão consolidada da turma com KPIs, distribuição de desempenho, ranking e evolução. Tudo calculado server-side a partir das mesmas funções puras usadas em `/notas` e `/dashboard-aluno`.
+Visão consolidada da turma com KPIs, distribuição de desempenho, ranking e evolução. Todos os cálculos respeitam atribuição (atividades não atribuídas ao aluno não entram).
 
 ---
 
-## 2. Filtros
+## 2. Filterbar (escolha de turma)
 
-- **Turma** (select obrigatório)
-- **Bimestres** (multi-select; default: todos os 4)
-  - O cálculo da "média da turma" e do "delta" leva em conta apenas os bimestres marcados
-  - Permite responder perguntas tipo "como foi o 3º bimestre isolado?" ou "comparativo entre 1º e 4º"
+Quando ainda não há turma escolhida, mostra cards das turmas + um `TurmaFilterBar` com 5 filtros:
+
+- **Disciplina**
+- **Ensino** (Fundamental I/II, Médio)
+- **Turno** (Matutino/Vespertino/Noturno)
+- **Ano**
+- **Escola**
+
+Estado em URL search params (`?disciplina=...&nivel=...&turno=...&ano=...&escola=...`). Cards filtrados em tempo real via `aplicarFiltros` (`lib/turma-filters.ts`).
 
 ---
 
-## 3. KPIs (cards do topo)
+## 3. Filtro de bimestres (depois de escolhida a turma)
+
+- Multi-select: 1º, 2º, 3º, 4º (default: todos)
+- O cálculo da "média da turma" considera apenas os bimestres marcados
+- Permite responder perguntas como "como foi o 3º bimestre isolado?" ou "1º vs. 4º"
+
+---
+
+## 4. KPIs
 
 | Card | O que mostra |
 |---|---|
 | **Total de alunos** | Quantidade de alunos na turma |
 | **Total de atividades** | Quantidade de atividades nos bimestres selecionados |
 | **Média da turma** | Média das médias anuais (considerando só os bimestres selecionados) — 0–10 |
-| **% de aprovados** | % de alunos com média anual ≥ 6.0 (mesma referência da Análise) |
-
-### Distribuição de desempenho
-
-Donut chart com 3 faixas (mesma cor das pílulas dos dashboards):
-
-- **Vermelha** — média < 6
-- **Alerta (amarelo)** — 6 ≤ média < 7
-- **Azul (verde)** — média ≥ 7
-
-Conta cada aluno em uma das três faixas conforme sua média anual.
+| **% de aprovados** | % de alunos com média ≥ 7 |
 
 ---
 
-## 4. Gráficos
+## 5. Distribuição (donut)
 
-### Média por bimestre (line chart)
+3 faixas (vermelha/alerta/azul) — cada aluno classificado em uma com base na média do filtro selecionado.
 
-- Eixo X: bimestres (1º a 4º)
-- Eixo Y: média da turma no bimestre
-- Bimestres não selecionados aparecem cinza/inativos
-- Mostra trajetória da turma ao longo do ano
-
-### Ranking de atividades (bar chart)
-
-- Top atividades por **menor média** (e/ou maior — versão atual mostra ranking ordenado)
-- Ajuda a identificar "qual prova foi mais difícil"
-- Média da atividade é normalizada para 0–10 (`valor / valorMaximo * 10`)
+- **Centro do donut:** mostra `100%` + "Total" + nº de alunos
+- **Hover numa fatia (ou na legenda lateral):** centro vira a `%` da fatia + nome da faixa + contagem, com cor da faixa
+- Animações: pop-in da fatia ativa, fade nas inativas, número central com bounce sutil
 
 ---
 
-## 5. Tabelas / listas
+## 6. Gráficos
 
-### Top alunos (5)
+### Média por bimestre (line)
 
-Top 5 com maior média anual (filtro de bimestres aplicado).
+Linha mostrando a evolução da média da turma ao longo dos bimestres selecionados.
 
-### Bottom alunos (5)
+### Ranking de atividades (bar)
 
-Os 5 com menor média anual — atenção pedagógica.
-
-### Mais melhoraram
-
-Comparando o **primeiro bimestre selecionado** com o **último** (cronologicamente), os 5 alunos com maior delta positivo.
-
-### Mais pioraram
-
-Mesma lógica, delta negativo. `bimRefA` e `bimRefB` no payload da action indicam quais bimestres foram usados na comparação.
-
-> Se só 1 bimestre estiver selecionado, "melhoraram" / "pioraram" ficam vazios.
+Top atividades por menor média (identifica "qual prova foi mais difícil"). Cada atividade é normalizada pra 0–10 considerando seu modo (MEDIA/SOMA) e respeita atribuição (alunos não atribuídos não entram na média).
 
 ---
 
-## 6. Server action
+## 7. Listas
+
+- **Top 5 alunos** (maior média)
+- **Bottom 5 alunos** (menor média)
+- **Mais melhoraram** (top 5 por delta entre primeiro e último bimestre selecionado)
+- **Mais pioraram** (idem, delta negativo)
+
+`bimRefA` e `bimRefB` no payload indicam quais bimestres foram comparados (primeiro e último cronológicos da seleção).
+
+> Se só 1 bimestre estiver selecionado, "melhoraram"/"pioraram" ficam vazios.
+
+---
+
+## 8. Server action
 
 `actions/analise.ts`:
 
@@ -93,7 +92,7 @@ Mesma lógica, delta negativo. `bimRefA` e `bimRefB` no payload da action indica
 getAnaliseTurma(turmaId, bimestres?): AnaliseResult
 ```
 
-`bimestres` é opcional — se omitido, usa todos os 4. Retorna:
+Retorna:
 
 ```ts
 interface AnaliseResult {
@@ -115,22 +114,25 @@ interface AnaliseResult {
 }
 ```
 
-A action carrega tudo em uma `Promise.all` (alunos, periodos, atividades, notas) e calcula em memória usando `mediaBimestre` / `mediaAnual` de `lib/analise-helpers.ts`. Sem N+1.
+A action carrega tudo via `Promise.all` (alunos, periodos, atividades incl. `tipoAtribuicao` + atribuições, notas) e calcula em memória usando `mediaBimestre` / `mediaAnual` de `lib/analise-helpers.ts`. Atribuições são respeitadas em todas as métricas.
 
 ---
 
-## 7. Decisões de design
+## 9. Decisões de design
 
-- **Vazio conta como 0** — coerente com a regra de cálculo de média do bimestre (ver `notas.md`). Aluno que não fez a atividade tem nota 0, não é "ignorado".
-- **Aprovação é hard cutoff em 6.0** — sem zona cinzenta. Quando tiver recuperação configurável, isso pode mudar.
-- **Multi-select de bimestres** vs. range — escolhido multi-select porque o professor pode querer comparar 1º e 4º pulando 2º e 3º.
-- **Tudo server-side** — payload da action já vem pronto, gráficos só renderizam. Reduz JS no cliente.
+- **Vazio = 0** nas médias do bimestre — coerente com `notas.md`
+- **Aprovação em 6.0** — hard cutoff sem zona cinzenta
+- **Multi-select de bimestres** vs. range — o professor pode querer comparar 1º e 4º pulando os do meio
+- **Atribuição respeitada** — atividade só de recuperação não pesa pra quem não fez
+- **Tudo server-side** — payload da action vem pronto, charts só renderizam
 
 ---
 
-## 8. Arquivos relacionados
+## 10. Arquivos relacionados
 
 - `app/(dashboard)/analise-turma/page.tsx` — página
-- `components/analise/` — KPIs, charts, tabelas
+- `components/analise/` — KPIs, charts, listas
+- `components/turmas/turma-filter-bar.tsx` — filterbar reaproveitada (também em `/turmas` e `/notas`)
 - `actions/analise.ts` — `getAnaliseTurma`
-- `lib/analise-helpers.ts` — funções puras de cálculo
+- `lib/analise-helpers.ts` — funções puras de cálculo (com atribuição)
+- `lib/turma-filters.ts` — `extrairFilterOptions`, `aplicarFiltros`

@@ -38,7 +38,7 @@ export default async function TurmasPage({
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
-        <NovaTurmaButton />
+        <NovaTurmaButton escolas={options.escolas} />
       </div>
 
       {turmas.length > 0 && <TurmaFilterBar options={options} />}

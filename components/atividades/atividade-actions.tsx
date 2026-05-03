@@ -39,7 +39,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Loader2, Pencil, Trash } from "lucide-react";
+import { ExternalLink, MoreVertical, Loader2, Pencil, Trash } from "lucide-react";
 import toast from "react-hot-toast";
 import { updateAtividade, removeAtividade } from "@/actions/atividades";
 
@@ -49,6 +49,7 @@ interface Atividade {
   valorMaximo: number;
   periodoId: string;
   data: Date | null;
+  tipo: "INDIVIDUAL" | "GRUPO";
 }
 
 interface PeriodoOption {
@@ -64,6 +65,7 @@ const schema = z.object({
   valorMaximo: z.coerce.number().positive("Valor máximo deve ser maior que 0"),
   periodoId: z.string().min(1),
   data: z.string().optional(),
+  tipo: z.enum(["INDIVIDUAL", "GRUPO"]),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -71,9 +73,10 @@ type FormData = z.infer<typeof schema>;
 interface Props {
   atividade: Atividade;
   periodos: PeriodoOption[];
+  dashboardHref: string;
 }
 
-export function AtividadeActions({ atividade, periodos }: Props) {
+export function AtividadeActions({ atividade, periodos, dashboardHref }: Props) {
   const [editOpen, setEditOpen] = React.useState(false);
   const [removeOpen, setRemoveOpen] = React.useState(false);
   const [isPending, startTransition] = React.useTransition();
@@ -83,6 +86,7 @@ export function AtividadeActions({ atividade, periodos }: Props) {
     valorMaximo: atividade.valorMaximo,
     periodoId: atividade.periodoId,
     data: dbToIsoString(atividade.data),
+    tipo: atividade.tipo,
   };
 
   const {
@@ -99,6 +103,7 @@ export function AtividadeActions({ atividade, periodos }: Props) {
   });
 
   const periodoId = watch("periodoId");
+  const tipo = watch("tipo");
   const periodoSelecionado = periodos.find((p) => p.id === periodoId);
   const modoSelecionado = periodoSelecionado?.modo ?? "MEDIA";
   const minDate = dbDateToLocalDate(periodoSelecionado?.dataInicio);
@@ -142,6 +147,14 @@ export function AtividadeActions({ atividade, periodos }: Props) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onSelect={() => {
+              window.open(dashboardHref, "_blank", "noopener,noreferrer");
+            }}
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Dashboard
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setEditOpen(true)}>
             <Pencil className="w-4 h-4 mr-2" />
             Editar
@@ -226,6 +239,23 @@ export function AtividadeActions({ atividade, periodos }: Props) {
                       {p.nome}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Tipo</Label>
+              <Select
+                value={tipo}
+                onValueChange={(v: "INDIVIDUAL" | "GRUPO") =>
+                  setValue("tipo", v)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="INDIVIDUAL">Individual</SelectItem>
+                  <SelectItem value="GRUPO">Em grupo</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -11,6 +11,7 @@ const atividadeSchema = z.object({
   valorMaximo: z.coerce.number().positive("Valor máximo deve ser maior que 0"),
   periodoId: z.string().min(1, "Período é obrigatório"),
   data: z.string().optional(), // ISO "YYYY-MM-DD" ou ""
+  tipo: z.enum(["INDIVIDUAL", "GRUPO"]).default("INDIVIDUAL"),
 });
 
 function parseData(raw: string | undefined): Date | null {
@@ -35,6 +36,20 @@ export async function listPeriodosComAtividades(turmaId: string) {
     include: {
       atividades: {
         orderBy: { createdAt: "asc" },
+        include: {
+          atribuicoes: {
+            select: { alunoId: true },
+          },
+          notas: {
+            select: { alunoId: true, valor: true },
+          },
+          grupos: {
+            orderBy: { createdAt: "asc" },
+            include: {
+              membros: { select: { alunoId: true } },
+            },
+          },
+        },
       },
     },
   });
@@ -94,6 +109,7 @@ export async function createAtividade(input: unknown) {
       nome: data.nome,
       valorMaximo: data.valorMaximo,
       data: dataParsed,
+      tipo: data.tipo,
       periodoId: data.periodoId,
       professorId,
     },
@@ -163,12 +179,89 @@ export async function updateAtividade(id: string, input: unknown) {
         nome: data.nome,
         valorMaximo: data.valorMaximo,
         data: dataParsed,
+        tipo: data.tipo,
         periodoId: data.periodoId,
       },
     }),
     ...updates,
   ]);
   revalidatePath(`/turmas/${found.periodo.turmaId}/atividades`);
+}
+
+export async function setAtribuicaoAtividade(
+  atividadeId: string,
+  alunoIds: string[],
+) {
+  const professorId = await getProfessorIdOrThrow();
+
+  const atividade = await prisma.atividade.findFirst({
+    where: { id: atividadeId, professorId },
+    include: { periodo: { select: { turmaId: true } } },
+  });
+  if (!atividade) throw new Error("Atividade não encontrada");
+
+  const turmaId = atividade.periodo.turmaId;
+
+  const alunosTurma = await prisma.aluno.findMany({
+    where: { turmaId, professorId },
+    select: { id: true },
+  });
+  const alunosTurmaIds = new Set(alunosTurma.map((a) => a.id));
+
+  // Filtra apenas alunos que pertencem à turma (defesa em profundidade)
+  const validIds = alunoIds.filter((id) => alunosTurmaIds.has(id));
+  const todosMarcados =
+    validIds.length === alunosTurmaIds.size && alunosTurmaIds.size > 0;
+
+  if (todosMarcados) {
+    // Volta para "TODOS" e limpa a tabela de junção.
+    // Não mexe em grupos: todos os atribuídos são todos, nenhum aluno fica órfão.
+    await prisma.$transaction([
+      prisma.atividadeAluno.deleteMany({ where: { atividadeId } }),
+      prisma.atividade.update({
+        where: { id: atividadeId },
+        data: { tipoAtribuicao: "TODOS" },
+      }),
+    ]);
+  } else {
+    // Vira SELECIONADOS. Remove dos grupos qualquer aluno que saiu da atribuição.
+    const selecionadosSet = new Set(validIds);
+    const removidos = Array.from(alunosTurmaIds).filter(
+      (id) => !selecionadosSet.has(id),
+    );
+
+    await prisma.$transaction([
+      prisma.atividadeAluno.deleteMany({ where: { atividadeId } }),
+      prisma.atividadeAluno.createMany({
+        data: validIds.map((alunoId) => ({
+          atividadeId,
+          alunoId,
+          professorId,
+        })),
+      }),
+      prisma.atividade.update({
+        where: { id: atividadeId },
+        data: { tipoAtribuicao: "SELECIONADOS" },
+      }),
+      // Cascata: remove dos grupos qualquer aluno desatribuído
+      ...(removidos.length > 0
+        ? [
+            prisma.grupoAluno.deleteMany({
+              where: {
+                professorId,
+                alunoId: { in: removidos },
+                grupo: { atividadeId },
+              },
+            }),
+          ]
+        : []),
+    ]);
+  }
+
+  revalidatePath(`/turmas/${turmaId}/atividades`);
+  revalidatePath(`/notas`);
+  revalidatePath(`/analise-turma`);
+  revalidatePath(`/dashboard-aluno`);
 }
 
 export async function removeAtividade(id: string) {

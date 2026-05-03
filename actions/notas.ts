@@ -28,6 +28,7 @@ export async function getNotasGrid(turmaId: string, bimestreOrdem: number) {
     prisma.atividade.findMany({
       where: { periodoId: periodo.id, professorId },
       orderBy: { createdAt: "asc" },
+      include: { atribuicoes: { select: { alunoId: true } } },
     }),
     prisma.nota.findMany({
       where: { professorId, atividade: { periodoId: periodo.id } },
@@ -35,7 +36,17 @@ export async function getNotasGrid(turmaId: string, bimestreOrdem: number) {
     }),
   ]);
 
-  return { alunos, atividades, notas, modoCalculo: periodo.modoCalculo };
+  const atividadesNorm = atividades.map((a) => ({
+    ...a,
+    alunosAtribuidos: a.atribuicoes.map((x) => x.alunoId),
+  }));
+
+  return {
+    alunos,
+    atividades: atividadesNorm,
+    notas,
+    modoCalculo: periodo.modoCalculo,
+  };
 }
 
 const setNotaSchema = z.object({
@@ -106,4 +117,7 @@ export async function setNota(
   revalidatePath(
     `/notas?turma=${aluno.turmaId}&bimestre=${atividade.periodo.ordem}`
   );
+  revalidatePath(`/turmas/${aluno.turmaId}/atividades`);
+  revalidatePath(`/analise-turma`);
+  revalidatePath(`/dashboard-aluno`);
 }

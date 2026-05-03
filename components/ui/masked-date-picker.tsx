@@ -7,7 +7,7 @@ import { Calendar } from "lucide-react";
 import { isoToLocalDate, localToIsoString } from "@/lib/dates";
 
 const inputClass =
-  "w-full bg-background border border-default-300 dark:border-default-700 rounded-md pl-3 pr-10 h-9 text-sm placeholder:text-accent-foreground/50 focus:outline-none focus:border-primary transition";
+  "w-full bg-background border border-default-300 rounded-md pl-3 pr-10 h-9 text-sm text-default-900 placeholder:text-accent-foreground/50 focus:outline-none focus:border-primary transition";
 
 const ALLOWED_NAV_KEYS = [
   "Backspace",

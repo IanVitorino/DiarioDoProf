@@ -24,6 +24,8 @@ interface Atividade {
   id: string;
   nome: string;
   valorMaximo: number;
+  tipoAtribuicao?: "TODOS" | "SELECIONADOS";
+  alunosAtribuidos?: string[];
 }
 
 interface Nota {
@@ -57,6 +59,13 @@ function parseNota(raw: string): number | null {
 
 function effectiveCap(modo: Modo, atividade: Atividade): number {
   return modo === "MEDIA" ? 10 : atividade.valorMaximo;
+}
+
+function alunoFaz(atividade: Atividade, alunoId: string): boolean {
+  if (!atividade.tipoAtribuicao || atividade.tipoAtribuicao === "TODOS") {
+    return true;
+  }
+  return (atividade.alunosAtribuidos ?? []).includes(alunoId);
 }
 
 export function NotasGrid({ alunos, atividades, notas, modoCalculo }: Props) {
@@ -129,11 +138,12 @@ export function NotasGrid({ alunos, atividades, notas, modoCalculo }: Props) {
   // MEDIA: simple average (cap efetivo = 10) → final 0–10
   // SOMA: sum, capped at 10 for display
   const calcularResultado = (alunoId: string): string => {
-    if (atividades.length === 0) return "0.0";
+    const ativsDoAluno = atividades.filter((a) => alunoFaz(a, alunoId));
+    if (ativsDoAluno.length === 0) return "—";
 
     if (modoCalculo === "SOMA") {
       let sum = 0;
-      for (const a of atividades) {
+      for (const a of ativsDoAluno) {
         const raw = values[cellKey(alunoId, a.id)] ?? "";
         sum += parseNota(raw) ?? 0;
       }
@@ -142,15 +152,12 @@ export function NotasGrid({ alunos, atividades, notas, modoCalculo }: Props) {
 
     // MEDIA
     let totalValor = 0;
-    let count = 0;
-    for (const a of atividades) {
+    for (const a of ativsDoAluno) {
       const raw = values[cellKey(alunoId, a.id)] ?? "";
       const num = parseNota(raw) ?? 0;
       totalValor += num;
-      count++;
     }
-    if (count === 0) return "0.0";
-    return (totalValor / count).toFixed(1);
+    return (totalValor / ativsDoAluno.length).toFixed(1);
   };
 
   const colunaFinalLabel = modoCalculo === "SOMA" ? "Total" : "Média";
@@ -189,18 +196,33 @@ export function NotasGrid({ alunos, atividades, notas, modoCalculo }: Props) {
                 const key = cellKey(aluno.id, a.id);
                 const isSaving = !!saving[key];
                 const cap = effectiveCap(modoCalculo, a);
+                const naoAtribuido = !alunoFaz(a, aluno.id);
                 return (
                   <TableCell key={a.id} className="p-2">
-                    <div className="relative">
+                    <div
+                      className="relative"
+                      title={
+                        naoAtribuido
+                          ? "Esta atividade não foi atribuída ao aluno"
+                          : undefined
+                      }
+                    >
                       <Input
                         value={values[key] ?? ""}
                         onChange={(e) => handleChange(key, e.target.value, cap)}
-                        onBlur={() => handleBlur(aluno.id, a.id, cap)}
+                        onBlur={() =>
+                          !naoAtribuido && handleBlur(aluno.id, a.id, cap)
+                        }
                         type="text"
                         inputMode="decimal"
-                        placeholder="—"
-                        className="text-center"
-                        disabled={isSaving}
+                        placeholder={naoAtribuido ? "—" : "—"}
+                        className={
+                          naoAtribuido
+                            ? "text-center bg-default-100 text-default-400 cursor-not-allowed"
+                            : "text-center"
+                        }
+                        disabled={isSaving || naoAtribuido}
+                        readOnly={naoAtribuido}
                       />
                       {isSaving && (
                         <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 animate-spin text-default-400" />

@@ -1,8 +1,8 @@
 # Notas — lançamento e cálculo
 
-Cobre a tela `/notas` (grid de lançamento), os modos de cálculo (MEDIA / SOMA) e as fórmulas usadas.
+Cobre a tela `/notas` (grid de lançamento), os modos de cálculo (MEDIA / SOMA), atribuição de atividades, notas em grupo e as fórmulas usadas.
 
-> Última atualização: 2026-05-02
+> Última atualização: 2026-05-03
 
 ---
 
@@ -20,113 +20,193 @@ A entidade `Nota` tem constraint `@@unique([alunoId, atividadeId])` — um aluno
 
 ## 2. Tela `/notas`
 
-- Dois selects: **Turma** e **Bimestre** (1º a 4º).
+- **Filterbar** acima — refina o dropdown de turma por disciplina/ensino/turno/ano/escola
+- Dois selects: **Turma** e **Bimestre** (1º a 4º)
 - Grid:
   - Linhas: alunos (em ordem alfabética)
   - Colunas: atividades do bimestre (em ordem de criação)
-  - Última coluna: **Média** do aluno no bimestre, calculada conforme o `modoCalculo` do período
-- Cada célula é um input numérico editável. Salvamento é **inline** (debounce ou onBlur — chama `setNota`).
-- Limpar uma célula = deletar a nota (passa `null`).
-- Empty states:
-  - Turma sem alunos → mensagem
-  - Bimestre sem atividades → mensagem com link pra `/turmas/[id]/atividades`
+  - Última coluna: **Total/Média** — calculada respeitando atribuição (atividades não atribuídas ao aluno não entram)
+- Cada célula é input numérico editável. Salvamento **on blur** via `setNota`. Limpar = deletar nota (passa `null`).
 
-### Indicador de modo de cálculo
+### Células desabilitadas (atividade não atribuída)
 
-O cabeçalho do grid mostra o modo atual do bimestre (MEDIA ou SOMA) com explicação do significado. O toggle real fica em `/turmas/[id]/atividades` (não duplicado em `/notas`).
+Quando uma atividade tem `tipoAtribuicao === SELECIONADOS` e o aluno **não** está na lista:
+- Célula renderiza em cinza com fundo levemente destacado
+- `disabled` + `readOnly` (não permite digitar)
+- Tooltip explicando "Esta atividade não foi atribuída ao aluno"
+- A nota não conta no cálculo do total da linha
+
+> Notas existentes **persistem** no banco mesmo quando o aluno é desatribuído depois — só ficam fora do cálculo. Se voltar a atribuir, a nota antiga reaparece.
 
 ---
 
-## 3. Modos de cálculo
+## 3. Atribuição de atividades
+
+Cada atividade tem `tipoAtribuicao`:
+- **`TODOS`** (default): toda turma faz, presente e futuro (alunos novos entram automaticamente)
+- **`SELECIONADOS`**: apenas alunos explicitamente marcados via `AtividadeAluno`
+
+A UI vive na **coluna Atribuição** da tela `/turmas/[id]/atividades`:
+- Badge "Para todos" (cinza) ou "X alunos" (verde-soft) — abre modal
+- Modal mostra checkboxes de cada aluno + master checkbox (com estado `indeterminate`)
+- Cada linha tem **input de nota** (bidirectional com `/notas` e dashboard atividades)
+- Salvar atribuição: marca/desmarca via `setAtribuicaoAtividade`. Se selecionou TODOS da turma, volta pra `tipoAtribuicao=TODOS` (libera entrada futura de alunos novos).
+
+### Cascade de atribuição
+
+Quando um aluno é desatribuído pela UI, a action `setAtribuicaoAtividade`:
+1. Remove a entrada `AtividadeAluno` (transação)
+2. **Remove o aluno de qualquer grupo** dessa atividade automaticamente
+
+Se o grupo fica vazio, ele permanece (deletar é decisão do professor).
+
+---
+
+## 4. Modos de cálculo
 
 ### MEDIA (default)
 
-- Cada nota representa **0–10** (independente do `valorMaximo` da atividade).
-- Média do bimestre = média aritmética simples das notas das atividades do bimestre.
-- Atividade sem nota (vazia) conta como **0**.
+- Cada nota representa **0–10** (independente do `valorMaximo` da atividade — em modo MEDIA o valor máximo efetivo é sempre 10)
+- Média do bimestre = média aritmética simples das notas das **atividades atribuídas ao aluno**
+- Atividade sem nota (vazia) conta como **0**
 
 ```
 mediaBimestre = (n1 + n2 + ... + nN) / N
+            (apenas atividades atribuídas ao aluno)
 ```
 
 ### SOMA
 
-- Cada nota representa um **valor parcial** que soma. O `valorMaximo` da atividade indica quanto vale.
-- Média do bimestre = soma de todas as notas, com **teto em 10**.
-- Atividade sem nota = **0** somado.
+- Cada nota representa um **valor parcial**. O `valorMaximo` da atividade indica quanto vale.
+- Média do bimestre = soma das notas das **atividades atribuídas**, com **teto em 10**
+- Atividade sem nota = **0** somado
 
 ```
-mediaBimestre = min(soma de todas as notas, 10)
+mediaBimestre = min(soma das notas atribuídas, 10)
 ```
-
-> Use SOMA quando o bimestre é tipo "10 pontos divididos em prova=4, trabalho=3, participação=3". Use MEDIA quando cada atividade vale 0-10 separadamente.
 
 ### Por que `vazio = 0`?
 
-Decisão consciente: tratar nota faltante como zero faz a média baixar e dá um sinal visual ("o aluno está perdendo pontos por não fazer"). Alternativa de "ignorar vazias" foi descartada porque permitia o aluno ter nota alta deixando atividades em branco.
+Decisão consciente: tratar nota faltante como zero faz a média baixar e dá um sinal visual. Alternativa de "ignorar vazias" foi descartada porque permitia ao aluno ter nota alta deixando atividades em branco.
 
 ---
 
-## 4. Média anual
+## 5. Reescala automática quando o cap muda
 
-Definida em `mediaAnual` (`lib/analise-helpers.ts`):
+A action `setModoCalculoPeriodo` e a action `updateAtividade` **reescalam as notas existentes** quando o cap efetivo da atividade muda — preserva o desempenho proporcional do aluno.
 
-- Pega cada bimestre que **tem atividades** (bimestres vazios são ignorados).
-- Calcula a média do bimestre conforme seu `modoCalculo`.
-- Faz a média aritmética dessas médias bimestrais.
+Fórmula: `novo = (antigo / capAntigo) × capNovo`, arredondado a 2 casas. Tudo numa transação.
+
+| Cenário | capAntigo | capNovo | Reescala? |
+|---|---|---|---|
+| Bimestre MEDIA → SOMA (peso 5) | 10 | 5 | sim, aplica em todas as atividades do bimestre |
+| Bimestre SOMA (peso 5) → MEDIA | 5 | 10 | sim |
+| Atividade SOMA peso 5 → SOMA peso 10 | 5 | 10 | sim, dobra |
+| Mover atividade entre períodos com modos diferentes | conforme bimestre origem/destino | conforme | sim |
+| Editar só nome ou data, mesmo cap | n | n | não toca |
+| MEDIA → MEDIA / SOMA → SOMA com mesmo peso | igual | igual | não toca |
+
+> A reescala pode produzir notas > 10 quando vinha de SOMA "bugada" com cap pequeno (ex: nota 8 num peso 3 → ao virar MEDIA fica 26.67). A UI dos dashboards expande o eixo X automaticamente quando há valores fora de [0,10].
+
+---
+
+## 6. Média anual
 
 ```
 mediaAnual = média(mediaBim_1, mediaBim_2, mediaBim_3, mediaBim_4)
-            (apenas bimestres com atividades entram)
+            (apenas bimestres com atividades atribuídas a esse aluno)
 ```
 
-Se nenhum bimestre tem atividade, `mediaAnual = null`.
-
-**Sem peso entre bimestres** — todos contam igual. Mudança futura.
+Se nenhum bimestre tem atividade atribuída, `mediaAnual = null`. Sem peso entre bimestres — todos contam igual.
 
 ---
 
-## 5. Server actions
+## 7. Notas em grupo (atividades GRUPO)
 
-Em `actions/notas.ts`:
+Quando `Atividade.tipo === GRUPO`, a tela `/turmas/[id]/atividades` permite criar grupos via modal dedicado (ver `parametros.md`).
 
-| Função                                | Retorno                                  | O que faz                                       |
-|---------------------------------------|------------------------------------------|-------------------------------------------------|
-| `getNotasGrid(turmaId, bimestreOrdem)` | `{ alunos, atividades, notas, modoCalculo }` | tudo que o grid precisa em uma chamada         |
-| `setNota(alunoId, atividadeId, valor)` | `void`                                  | upsert (cria/atualiza) ou delete se `valor=null` |
+### Campo "Nota do grupo"
 
-Validações:
-- `getNotasGrid` valida que turma e período pertencem ao professor (lança "Turma não encontrada" / "Bimestre não encontrado" caso contrário).
-- `setNota` valida que aluno e atividade pertencem ao professor e à mesma turma.
-- `valor` é float, mínimo 0. Sem teto explícito (pode ser usado em qualquer modo).
+- Persistido em `Grupo.notaGrupo` (Float?)
+- Quando preenchido via UI: a action `setNotaGrupo`:
+  1. Atualiza `Grupo.notaGrupo`
+  2. Cria `Nota` com esse valor para os membros **que ainda não têm nota** na atividade
+  3. Membros que já têm nota individual mantêm o valor (override individual)
+- Tudo numa transação
+
+### Notas individuais dentro do grupo
+
+Cada membro tem campo de nota próprio na lista do modal. Salva on blur via `setNota`. É bidirectional com:
+- Grid `/notas`
+- Modal de atribuição
+- Tela `/dashboard-atividades`
+
+A regra de "muda em um, muda nos três" funciona via `revalidatePath` cruzado em `setNota` e `setNotaGrupo`.
 
 ---
 
-## 6. Helpers de cálculo
+## 8. Server actions
 
-`lib/analise-helpers.ts` — funções puras, reutilizadas por `notas`, `analise-turma` e `dashboard-aluno`:
+### `actions/notas.ts`
+
+| Função                                | Retorno                                      | O que faz                                       |
+|---------------------------------------|----------------------------------------------|-------------------------------------------------|
+| `getNotasGrid(turmaId, bimestreOrdem)` | `{ alunos, atividades, notas, modoCalculo }` | inclui `tipoAtribuicao` + `alunosAtribuidos` por atividade |
+| `setNota(alunoId, atividadeId, valor)` | `void`                                      | upsert ou delete (se valor=null). Revalida `/notas`, `/turmas/[id]/atividades`, `/analise-turma`, `/dashboard-aluno`, `/dashboard-atividades` |
+
+### `actions/grupos.ts`
+
+| Função                              | Retorno     | O que faz                                |
+|-------------------------------------|-------------|------------------------------------------|
+| `setNotaGrupo(grupoId, valor)`      | `void`      | persiste `notaGrupo` + cria notas pros membros vazios (transação) |
+
+### `actions/periodos.ts`
+
+| Função                              | Retorno     | O que faz                                       |
+|-------------------------------------|-------------|-------------------------------------------------|
+| `setModoCalculoPeriodo(periodoId, modo)` | `void` | troca MEDIA ↔ SOMA + reescala notas (transação) |
+
+### `actions/atividades.ts`
+
+| Função                              | Retorno     | O que faz                                       |
+|-------------------------------------|-------------|-------------------------------------------------|
+| `updateAtividade(id, input)`        | `void`      | atualização + reescala se cap mudou             |
+| `setAtribuicaoAtividade(atividadeId, alunoIds[])` | `void` | TODOS/SELECIONADOS + remove cascateadamente de grupos |
+
+---
+
+## 9. Helpers de cálculo
+
+`lib/analise-helpers.ts` — funções puras, reutilizadas em `notas`, `analise`, `dashboard-aluno`, `dashboard-atividades`:
 
 ```ts
+alunoFazAtividade(atividade, alunoId): boolean
 mediaBimestre(alunoId, periodo, atividades, notas): number | null
 mediaAnual(alunoId, periodos, atividades, notas): number | null
 ```
 
-Tipos mínimos (não pegam o objeto Prisma cheio):
+Tipos mínimos:
 
 ```ts
+interface AtividadeMin {
+  id: string;
+  valorMaximo: number;
+  periodoId: string;
+  tipoAtribuicao?: "TODOS" | "SELECIONADOS";
+  alunosAtribuidos?: string[];
+}
 interface PeriodoMin { id, ordem, modoCalculo: "MEDIA" | "SOMA" }
-interface AtividadeMin { id, valorMaximo, periodoId }
 interface NotaMin { alunoId, atividadeId, valor }
 ```
 
-Manter como funções puras facilita testar e reusar fora de actions.
+`alunoFazAtividade` retorna `true` quando `tipoAtribuicao=TODOS` ou (`tipoAtribuicao=SELECIONADOS` && alunoId está em `alunosAtribuidos`). Usada como filtro inicial em `mediaBimestre`.
 
 ---
 
-## 7. Arquivos relacionados
+## 10. Arquivos relacionados
 
 - `app/(dashboard)/notas/page.tsx` — página
-- `components/notas/` — grid e componentes
+- `components/notas/notas-grid.tsx` — grid editável + lógica de cap
 - `actions/notas.ts` — actions
-- `lib/analise-helpers.ts` — `mediaBimestre`, `mediaAnual`
-- `prisma/schema.prisma` — model `Nota`, enum `ModoCalculo`
+- `lib/analise-helpers.ts` — fórmulas
+- `prisma/schema.prisma` — model `Nota`, `AtividadeAluno`, `Grupo`, `GrupoAluno`, enums

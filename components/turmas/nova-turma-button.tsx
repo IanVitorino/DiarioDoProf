@@ -62,9 +62,15 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export function NovaTurmaButton() {
+interface NovaTurmaButtonProps {
+  escolas?: string[];
+}
+
+export function NovaTurmaButton({ escolas = [] }: NovaTurmaButtonProps) {
   const [open, setOpen] = React.useState(false);
   const [discOpen, setDiscOpen] = React.useState(false);
+  const [escolaOpen, setEscolaOpen] = React.useState(false);
+  const [escolaQuery, setEscolaQuery] = React.useState("");
   const [isPending, startTransition] = React.useTransition();
 
   const {
@@ -88,6 +94,7 @@ export function NovaTurmaButton() {
   });
 
   const nivel = watch("nivel");
+  const escolaSelecionada = watch("escola");
   const turno = watch("turno");
   const disciplina = watch("disciplina");
 
@@ -315,12 +322,109 @@ export function NovaTurmaButton() {
 
           <div>
             <Label htmlFor="escola">Escola</Label>
-            <Input
-              id="escola"
-              {...register("escola")}
-              placeholder="Ex: EE Manuel Bandeira"
-              maxLength={120}
-            />
+            <Popover open={escolaOpen} onOpenChange={setEscolaOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={escolaOpen}
+                  className="w-full justify-between font-normal"
+                >
+                  <span className={cn(!escolaSelecionada && "text-default-500", "truncate")}>
+                    {escolaSelecionada || "Selecione ou digite uma escola"}
+                  </span>
+                  <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="p-0 w-[var(--radix-popover-trigger-width)] z-[10000]"
+                align="start"
+              >
+                <Command
+                  filter={(value, search) => {
+                    const stripDiacritics = (s: string) =>
+                      s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+                    return stripDiacritics(value).includes(
+                      stripDiacritics(search),
+                    )
+                      ? 1
+                      : 0;
+                  }}
+                >
+                  <CommandInput
+                    placeholder="Buscar ou criar nova..."
+                    value={escolaQuery}
+                    onValueChange={setEscolaQuery}
+                    maxLength={120}
+                  />
+                  <CommandList
+                    className="max-h-72 overflow-y-auto"
+                    onWheel={(e) => e.stopPropagation()}
+                    onTouchMove={(e) => e.stopPropagation()}
+                  >
+                    {escolas.length > 0 && (
+                      <CommandGroup heading="Suas escolas">
+                        {escolas.map((e) => (
+                          <CommandItem
+                            key={e}
+                            value={e}
+                            onSelect={() => {
+                              setValue("escola", e, { shouldValidate: true });
+                              setEscolaQuery("");
+                              setEscolaOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                escolaSelecionada === e
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                            <span className="truncate">{e}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                    {(() => {
+                      const trimmed = escolaQuery.trim();
+                      const jaExiste = escolas.some(
+                        (e) =>
+                          e.toLowerCase() === trimmed.toLowerCase(),
+                      );
+                      if (trimmed === "" || jaExiste) {
+                        return escolas.length === 0 ? (
+                          <CommandEmpty>
+                            Digite o nome da escola pra criar.
+                          </CommandEmpty>
+                        ) : null;
+                      }
+                      return (
+                        <CommandGroup heading="Adicionar nova">
+                          <CommandItem
+                            value={`__new__${trimmed}`}
+                            onSelect={() => {
+                              setValue("escola", trimmed, {
+                                shouldValidate: true,
+                              });
+                              setEscolaQuery("");
+                              setEscolaOpen(false);
+                            }}
+                          >
+                            <Plus className="mr-2 h-4 w-4 text-primary" />
+                            <span className="truncate">
+                              Criar &ldquo;{trimmed}&rdquo;
+                            </span>
+                          </CommandItem>
+                        </CommandGroup>
+                      );
+                    })()}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             {errors.escola && (
               <p className="text-destructive text-sm mt-1">{errors.escola.message}</p>
             )}

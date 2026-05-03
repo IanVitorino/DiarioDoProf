@@ -1,4 +1,6 @@
 import { listPeriodosComAtividades } from "@/actions/atividades";
+import { listAlunosByTurma } from "@/actions/alunos";
+import { getTurma } from "@/actions/turmas";
 import { Card } from "@/components/ui/card";
 import {
   Table,
@@ -10,6 +12,8 @@ import {
 } from "@/components/ui/table";
 import { NovaAtividadeButton } from "@/components/atividades/nova-atividade-button";
 import { AtividadeActions } from "@/components/atividades/atividade-actions";
+import { AtribuicaoButton } from "@/components/atividades/atribuicao-button";
+import { GruposButton } from "@/components/atividades/grupos-button";
 import { ModoCalculoToggle } from "@/components/atividades/modo-toggle";
 import { bimestreNome } from "@/lib/turma-format";
 import { formatBrazilDate } from "@/lib/dates";
@@ -19,7 +23,18 @@ export default async function AtividadesTabPage({
 }: {
   params: { id: string };
 }) {
-  const periodos = await listPeriodosComAtividades(params.id);
+  const [periodos, alunosTurma, turma] = await Promise.all([
+    listPeriodosComAtividades(params.id),
+    listAlunosByTurma(params.id),
+    getTurma(params.id),
+  ]);
+
+  const escolaParam = turma?.escola && turma.escola.trim() !== ""
+    ? turma.escola
+    : "__SEM_ESCOLA__";
+
+  const dashboardHref = (atividadeId: string) =>
+    `/dashboard-atividades?escola=${encodeURIComponent(escolaParam)}&turma=${params.id}&atividade=${atividadeId}`;
 
   const periodoOptions = periodos.map((p) => ({
     id: p.id,
@@ -27,6 +42,11 @@ export default async function AtividadesTabPage({
     modo: p.modoCalculo as "MEDIA" | "SOMA",
     dataInicio: p.dataInicio,
     dataFim: p.dataFim,
+  }));
+
+  const alunosTurmaSimple = alunosTurma.map((a) => ({
+    id: a.id,
+    nome: a.nome,
   }));
 
   return (
@@ -66,6 +86,7 @@ export default async function AtividadesTabPage({
                       <TableHead className="w-32">
                         {modo === "SOMA" ? "Peso" : "Valor máximo"}
                       </TableHead>
+                      <TableHead className="w-40">Atribuição</TableHead>
                       <TableHead className="w-16"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -80,9 +101,47 @@ export default async function AtividadesTabPage({
                           {modo === "SOMA" ? atividade.valorMaximo : 10}
                         </TableCell>
                         <TableCell>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <AtribuicaoButton
+                              atividadeId={atividade.id}
+                              atividadeNome={atividade.nome}
+                              tipoAtribuicao={
+                                atividade.tipoAtribuicao as "TODOS" | "SELECIONADOS"
+                              }
+                              alunosAtribuidos={atividade.atribuicoes.map(
+                                (x) => x.alunoId,
+                              )}
+                              alunosTurma={alunosTurmaSimple}
+                              modoCalculo={modo}
+                              valorMaximo={atividade.valorMaximo}
+                              notas={atividade.notas}
+                            />
+                            {atividade.tipo === "GRUPO" && (
+                              <GruposButton
+                                atividadeId={atividade.id}
+                                atividadeNome={atividade.nome}
+                                grupos={atividade.grupos}
+                                alunosAtribuidos={
+                                  atividade.tipoAtribuicao === "TODOS"
+                                    ? alunosTurmaSimple
+                                    : alunosTurmaSimple.filter((a) =>
+                                        atividade.atribuicoes.some(
+                                          (x) => x.alunoId === a.id,
+                                        ),
+                                      )
+                                }
+                                modoCalculo={modo}
+                                valorMaximo={atividade.valorMaximo}
+                                notas={atividade.notas}
+                              />
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
                           <AtividadeActions
                             atividade={atividade}
                             periodos={periodoOptions}
+                            dashboardHref={dashboardHref(atividade.id)}
                           />
                         </TableCell>
                       </TableRow>

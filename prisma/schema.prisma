@@ -33,6 +33,16 @@ enum Turno {
   NOTURNO
 }
 
+enum TipoAtribuicao {
+  TODOS
+  SELECIONADOS
+}
+
+enum TipoAtividade {
+  INDIVIDUAL
+  GRUPO
+}
+
 model Professor {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -82,7 +92,9 @@ model Aluno {
   turmaId     String
   turma       Turma     @relation(fields: [turmaId], references: [id], onDelete: Cascade)
 
-  notas Nota[]
+  notas       Nota[]
+  atribuicoes AtividadeAluno[]
+  grupos      GrupoAluno[]
 
   @@index([professorId])
   @@index([turmaId])
@@ -110,22 +122,74 @@ model Periodo {
 }
 
 model Atividade {
-  id          String    @id @default(uuid())
-  nome        String
-  valorMaximo Float     @default(10)
-  data        DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String         @id @default(uuid())
+  nome            String
+  valorMaximo     Float          @default(10)
+  data            DateTime?
+  tipo            TipoAtividade  @default(INDIVIDUAL)
+  tipoAtribuicao  TipoAtribuicao @default(TODOS)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   professorId String
   professor   Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
   periodoId   String
   periodo     Periodo   @relation(fields: [periodoId], references: [id], onDelete: Cascade)
 
-  notas Nota[]
+  notas        Nota[]
+  atribuicoes  AtividadeAluno[]
+  grupos       Grupo[]
 
   @@index([professorId])
   @@index([periodoId])
+}
+
+model Grupo {
+  id          String   @id @default(uuid())
+  nome        String
+  tema        String?
+  notaGrupo   Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  atividadeId String
+  atividade   Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+  professorId String
+
+  membros GrupoAluno[]
+
+  @@index([atividadeId])
+  @@index([professorId])
+}
+
+model GrupoAluno {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  grupoId     String
+  grupo       Grupo  @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  alunoId     String
+  aluno       Aluno  @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  professorId String
+
+  @@unique([grupoId, alunoId])
+  @@index([alunoId])
+  @@index([professorId])
+}
+
+model AtividadeAluno {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+
+  atividadeId String
+  atividade   Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+  alunoId     String
+  aluno       Aluno     @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  professorId String
+
+  @@unique([atividadeId, alunoId])
+  @@index([alunoId])
+  @@index([professorId])
 }
 
 model Nota {

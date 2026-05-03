@@ -16,6 +16,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowRight, CalendarX2, Loader2, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import { createAtividade } from "@/actions/atividades";
@@ -26,6 +33,7 @@ const schema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   valorMaximo: z.coerce.number().positive("Valor máximo deve ser maior que 0"),
   data: z.string().optional(),
+  tipo: z.enum(["INDIVIDUAL", "GRUPO"]),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -57,11 +65,15 @@ export function NovaAtividadeButton({
     handleSubmit,
     reset,
     control,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { nome: "", valorMaximo: 10, data: "" },
+    defaultValues: { nome: "", valorMaximo: 10, data: "", tipo: "INDIVIDUAL" },
   });
+
+  const tipo = watch("tipo");
 
   const onSubmit = (data: FormData) => {
     startTransition(async () => {
@@ -135,6 +147,24 @@ export function NovaAtividadeButton({
                     />
                   )}
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="tipo">Tipo</Label>
+                <Select
+                  value={tipo}
+                  onValueChange={(v: "INDIVIDUAL" | "GRUPO") =>
+                    setValue("tipo", v)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="INDIVIDUAL">Individual</SelectItem>
+                    <SelectItem value="GRUPO">Em grupo</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {modo === "SOMA" ? (

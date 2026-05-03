@@ -1,4 +1,10 @@
-import { Users, ClipboardList, BarChart3, UserCircle } from "lucide-react";
+import {
+  Users,
+  ClipboardList,
+  BarChart3,
+  UserCircle,
+  Activity,
+} from "lucide-react";
 
 
 export interface MenuItemProps {
@@ -34,6 +40,7 @@ export const menusConfig = {
       { isHeader: true, title: "Dados" },
       { title: "Análise da turma", icon: BarChart3, href: "/analise-turma" },
       { title: "Dashboard aluno", icon: UserCircle, href: "/dashboard-aluno" },
+      { title: "Dashboard atividades", icon: Activity, href: "/dashboard-atividades" },
     ] as MenuItemProps[],
   },
 };

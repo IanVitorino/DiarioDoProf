@@ -1,8 +1,8 @@
 # Perfil e autenticação
 
-Cobre login/signup, sessão, página `/perfil` e upload de avatar.
+Cobre login/signup, sessão e a página `/perfil`.
 
-> Última atualização: 2026-05-02
+> Última atualização: 2026-05-03
 
 ---
 
@@ -24,125 +24,97 @@ Cobre login/signup, sessão, página `/perfil` e upload de avatar.
 
 ### Política
 
-- Email único, normalizado em lowercase + trim antes de salvar.
-- Senha mínima de 8 caracteres. Sem exigência de complexidade.
-- Sem verificação de email no signup (TODO quando houver SMTP).
-- Logout (`signOut({ callbackUrl: "/login" })`) volta para `/login`.
+- Email único, normalizado em lowercase + trim antes de salvar
+- Senha mínima de 8 caracteres. Sem exigência de complexidade
+- Sem verificação de email no signup (TODO quando houver SMTP)
+- Logout (`signOut({ callbackUrl: "/login" })`) volta para `/login`
 
 ### Middleware
 
 `middleware.ts` protege todas as rotas dentro de `(dashboard)` e o `app/api`. Sem sessão → redirect para `/login`.
 
----
-
-## 2. Sessão e propagação do avatar
-
-### O que vai no JWT
-
-- `token.id` — `professorId`
-- `token.picture` — `avatarUrl` do professor (carregado do DB no callback)
-- Demais campos default do NextAuth (`name`, `email`, `sub`)
-
 ### Callbacks (`lib/auth.ts`)
 
-- **`jwt({ token, user, trigger })`**:
-  - No login (`user` presente) carrega `id` e busca `avatarUrl` do banco.
-  - Quando `trigger === "update"` (chamado via `session.update()`), refaz a query e atualiza `picture`.
-  - Em outras requisições, usa o token cacheado (não consulta DB).
+```ts
+async jwt({ token, user }) {
+  if (user) token.id = user.id;
+  return token;
+}
+async session({ session, token }) {
+  if (session.user && token.id) {
+    session.user.id = token.id;
+  }
+  return session;
+}
+```
 
-- **`session({ session, token })`**:
-  - Expõe `session.user.id` e `session.user.image` (que vem do `token.picture`).
+Simples — só propaga `professorId` via JWT para uso server-side em `getProfessorIdOrThrow()`.
 
-### Por que via JWT?
+---
 
-Evita consulta ao banco em toda requisição. O `update()` força refresh quando o usuário troca a foto — só nesse momento bate no DB.
+## 2. Avatar
+
+**Não há upload.** O avatar é gerado a partir das **iniciais do nome**, com fundo na cor primária do sistema (teal).
+
+### Componente `InitialsAvatar`
+
+`components/ui/initials-avatar.tsx`:
+
+```tsx
+<InitialsAvatar name="Ian Vitorino" className="h-10 w-10 text-sm" />
+// → círculo teal com "IV"
+```
+
+Regras pra extrair iniciais:
+- Trim + split por whitespace
+- 0 palavras → `?`
+- 1 palavra → primeira letra (ex: "Ian" → "I")
+- 2+ palavras → primeira letra do primeiro nome + primeira letra da última palavra (ex: "Ian Vitorino" → "IV", "Ian da Silva Vitorino" → "IV")
+- Sempre uppercase
+
+Reutilizado em:
+- Tela `/perfil` (120×120 px)
+- Header — trigger do dropdown (36×36 px)
+- Header — dentro do dropdown (40×40 px)
+
+### Por que iniciais e não foto?
+
+- Simplicidade: zero infra de storage, zero UI de upload, zero validação de imagem
+- Visualmente consistente: todos os usuários do sistema têm avatar imediato
+- Decisão registrada em 2026-05-02
 
 ---
 
 ## 3. Tela `/perfil`
 
 ```
-/perfil → mostra avatar + dados + botão de troca de foto
+/perfil → mostra avatar (iniciais) + dados + total de turmas
 ```
 
-Componentes:
+Estrutura:
+- Card com `<InitialsAvatar size 120>`
+- Nome
+- Email
+- Total de turmas (cor primária + label)
 
-- **`AvatarUpload`** (client) — abre file picker, dispara `uploadAvatar`, mostra spinner + modal de erro.
-- **Card** com:
-  - Foto (com botão `Camera` sobreposto)
-  - Nome
-  - Email
-  - Total de turmas (cor primária + label)
-
-### Por que mostrar "total de turmas"?
-
-Métrica simples que dá vida à tela. Quando o sistema tiver mais "ações de perfil" (trocar senha, exportar dados, deletar conta), eles entram aqui.
+Sem campos editáveis no momento. Pode ganhar trocar nome / trocar senha futuramente.
 
 ---
 
-## 4. Upload de avatar
-
-### Server action `uploadAvatar(formData)`
-
-`actions/perfil.ts`:
-
-1. Valida que o arquivo existe e é `image/png`, `image/jpeg` ou `image/webp`.
-2. Limita tamanho a 5MB.
-3. Processa com **sharp**:
-   - `.rotate()` — corrige orientação EXIF (foto de celular vinda de iPhone, etc).
-   - `.resize(400, 400, { fit: "cover", position: "centre" })` — recorta quadrado.
-   - `.jpeg({ quality: 85 })` — saída padronizada em JPEG.
-4. Salva em `public/uploads/avatars/<professorId>.jpg` (sobrescreve se existir).
-5. Atualiza `Professor.avatarUrl = /uploads/avatars/<id>.jpg?v=<timestamp>` (cachebust).
-6. `revalidatePath("/perfil")` e `revalidatePath("/", "layout")` (refresca header).
-
-### Resposta
-
-```ts
-{ ok: true; avatarUrl: string }
-| { ok: false; error: string }
-```
-
-O componente client chama `update()` da `useSession()` após sucesso → JWT é refeito → `session.user.image` atualiza → header reflete a nova foto sem reload.
-
-### Storage
-
-- **Hoje:** filesystem local em `public/uploads/avatars/`. Servido direto pelo Next.
-- **Planejado:** S3 quando o projeto for deployado. Vai exigir só trocar a parte de `writeFile` por `s3.putObject` e o `avatarUrl` pra URL absoluta.
-
-### Limites
-
-- Tamanho: 5MB (antes do processamento)
-- Formatos aceitos: PNG, JPEG, WebP
-- Saída sempre 400×400 JPEG q85 (~30-60KB típico)
-
----
-
-## 5. Header — exibição do avatar
+## 4. Header — dropdown de perfil
 
 `components/partials/header/profile-info.tsx`:
 
-- Carrega `session.user.image` (vindo do JWT).
-- Se `null`, usa o `avatarPlaceholder` importado do template.
-- `unoptimized` no `<Image>` quando o src é string (porque o Next/Image não lida bem com query strings tipo `?v=...`).
+- Avatar do trigger usa `InitialsAvatar` lendo `session.user.name`
+- Loading state: bolinha pulsante com `bg-primary/30 animate-pulse`
 - Dropdown:
-  - Header com foto + nome + email
+  - Header com avatar + nome + email
   - **Meu perfil** (link → `/perfil`)
   - **Sair** (`signOut`)
 
 ---
 
-## 6. Server action
-
-`actions/perfil.ts`:
-
-```ts
-getMeuPerfil(): Promise<{
-  id, nome, email, avatarUrl, createdAt, totalTurmas
-}>
-
-uploadAvatar(formData): Promise<UploadAvatarResult>
-```
+## 5. Server actions
 
 `actions/auth.ts`:
 
@@ -150,19 +122,29 @@ uploadAvatar(formData): Promise<UploadAvatarResult>
 createAccount({ nome, email, password }): Promise<SignupResult>
 ```
 
+Valida (Zod), hash bcrypt, cria `Professor`. Não verifica email.
+
+`actions/perfil.ts`:
+
+```ts
+getMeuPerfil(): Promise<{
+  id, nome, email, createdAt, totalTurmas
+}>
+```
+
+Faz `Promise.all([findUniqueOrThrow, count])` e retorna o agregado. Sem foto, sem upload.
+
 ---
 
-## 7. Decisões de design
+## 6. Decisões de design
 
-- **JWT carrega `picture`** — evita consulta ao banco a cada request, mas precisa de `update()` explícito após upload.
-- **`update()` no client** após upload — força refresh do JWT sem reload completo.
-- **Cachebust com `?v=<timestamp>` na URL** — Next.js cacheia imagens estáticas agressivamente; sem isso a foto antiga continuaria aparecendo.
-- **Filesystem local primeiro** — simples e funciona em dev. Migrar pra S3 antes do deploy em produção.
-- **Sharp pra processar** — orientação EXIF + resize + recompressão garantem arquivo pequeno e padronizado independente do que o usuário envia.
+- **JWT só carrega `id`** — não precisa propagar mais nada porque o avatar é puramente derivado do nome
+- **Sem upload** — escolha consciente após avaliar custo/benefício do feature
+- **Iniciais reutilizáveis** — mesmo padrão visual em qualquer lugar que mostre avatar
 
 ---
 
-## 8. Arquivos relacionados
+## 7. Arquivos relacionados
 
 - `lib/auth.ts` — config NextAuth + callbacks JWT/session
 - `lib/session.ts` — `getProfessorIdOrThrow()`
@@ -171,7 +153,6 @@ createAccount({ nome, email, password }): Promise<SignupResult>
 - `app/(auth)/{login,signup}/page.tsx` — telas
 - `components/auth/{login-form,register-form}.tsx` — forms
 - `app/(dashboard)/perfil/page.tsx` — tela de perfil
-- `components/perfil/avatar-upload.tsx` — upload client
+- `components/ui/initials-avatar.tsx` — avatar de iniciais
 - `components/partials/header/profile-info.tsx` — dropdown do header
 - `actions/{auth,perfil}.ts` — server actions
-- `public/uploads/avatars/` — diretório de avatares (gitkeep'd)

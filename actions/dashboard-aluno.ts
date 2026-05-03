@@ -82,6 +82,8 @@ export async function getDashboardAluno(
         periodoId: true,
         data: true,
         createdAt: true,
+        tipoAtribuicao: true,
+        atribuicoes: { select: { alunoId: true } },
       },
     }),
     prisma.nota.findMany({
@@ -94,15 +96,20 @@ export async function getDashboardAluno(
     }),
   ]);
 
+  const atividadesNorm = atividades.map((a) => ({
+    ...a,
+    alunosAtribuidos: a.atribuicoes.map((x) => x.alunoId),
+  }));
+
   // Médias por bimestre
   const mediasPorBimAluno = periodos.map((p) => ({
     ordem: p.ordem,
-    media: mediaBimestre(aluno.id, p, atividades, notas),
+    media: mediaBimestre(aluno.id, p, atividadesNorm, notas),
   }));
   const mediasPorBimTurma = periodos.map((p) => {
     const medias: number[] = [];
     for (const a of todosAlunos) {
-      const m = mediaBimestre(a.id, p, atividades, notas);
+      const m = mediaBimestre(a.id, p, atividadesNorm, notas);
       if (m !== null) medias.push(m);
     }
     return {
@@ -114,13 +121,13 @@ export async function getDashboardAluno(
     };
   });
 
-  const minhaMediaAnual = mediaAnual(aluno.id, periodos, atividades, notas);
+  const minhaMediaAnual = mediaAnual(aluno.id, periodos, atividadesNorm, notas);
 
   // Rank: ordena alunos por média anual desc
   const ranking = todosAlunos
     .map((a) => ({
       id: a.id,
-      media: mediaAnual(a.id, periodos, atividades, notas),
+      media: mediaAnual(a.id, periodos, atividadesNorm, notas),
     }))
     .sort((a, b) => (b.media ?? -Infinity) - (a.media ?? -Infinity));
   const rank = ranking.findIndex((r) => r.id === aluno.id) + 1;
@@ -155,10 +162,14 @@ export async function getDashboardAluno(
   }
 
   // Atividades cronológicas com nota do aluno
-  const atividadesCronologicas: AtividadePonto[] = atividades
+  const atividadesCronologicas: AtividadePonto[] = atividadesNorm
     .map((a) => {
       const periodo = periodos.find((p) => p.id === a.periodoId);
       if (!periodo) return null;
+      // Apenas atividades atribuídas ao aluno
+      const isTodos =
+        !a.tipoAtribuicao || a.tipoAtribuicao === "TODOS";
+      if (!isTodos && !a.alunosAtribuidos.includes(aluno.id)) return null;
       const cap =
         periodo.modoCalculo === "MEDIA" ? 10 : a.valorMaximo;
       const nota = notas.find(

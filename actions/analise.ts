@@ -80,13 +80,25 @@ export async function getAnaliseTurma(
     }),
     prisma.atividade.findMany({
       where: { professorId, periodo: { turmaId } },
-      select: { id: true, nome: true, valorMaximo: true, periodoId: true },
+      select: {
+        id: true,
+        nome: true,
+        valorMaximo: true,
+        periodoId: true,
+        tipoAtribuicao: true,
+        atribuicoes: { select: { alunoId: true } },
+      },
     }),
     prisma.nota.findMany({
       where: { professorId, atividade: { periodo: { turmaId } } },
       select: { alunoId: true, atividadeId: true, valor: true },
     }),
   ]);
+
+  const atividadesNorm = atividades.map((a) => ({
+    ...a,
+    alunosAtribuidos: a.atribuicoes.map((x) => x.alunoId),
+  }));
 
   // Normaliza seleção: vazio ou todos os 4 = ano todo
   const validInput = (bimestresInput ?? [])
@@ -98,7 +110,7 @@ export async function getAnaliseTurma(
   const periodosSel = periodos.filter((p) =>
     bimestresSelecionados.includes(p.ordem)
   );
-  const atividadesSel = atividades.filter((a) =>
+  const atividadesSel = atividadesNorm.filter((a) =>
     periodosSel.some((p) => p.id === a.periodoId)
   );
 
@@ -106,7 +118,7 @@ export async function getAnaliseTurma(
   const mediaAluno = (alunoId: string): number | null => {
     const medias: number[] = [];
     for (const p of periodosSel) {
-      const m = mediaBimestre(alunoId, p, atividades, notas);
+      const m = mediaBimestre(alunoId, p, atividadesNorm, notas);
       if (m !== null) medias.push(m);
     }
     if (medias.length === 0) return null;
@@ -142,7 +154,7 @@ export async function getAnaliseTurma(
   const mediaPorBimestre: MediaBimPoint[] = periodosSel.map((p) => {
     const medias: number[] = [];
     for (const a of alunos) {
-      const m = mediaBimestre(a.id, p, atividades, notas);
+      const m = mediaBimestre(a.id, p, atividadesNorm, notas);
       if (m !== null) medias.push(m);
     }
     return {
@@ -161,20 +173,25 @@ export async function getAnaliseTurma(
       if (!periodo) return null;
       const cap = periodo.modoCalculo === "MEDIA" ? 10 : a.valorMaximo;
       if (cap <= 0) return null;
+      const isTodos =
+        !a.tipoAtribuicao || a.tipoAtribuicao === "TODOS";
+      const atribuidos = new Set(a.alunosAtribuidos ?? []);
       let total = 0;
       let count = 0;
       for (const aluno of alunos) {
+        if (!isTodos && !atribuidos.has(aluno.id)) continue;
         const n = notas.find(
           (nn) => nn.alunoId === aluno.id && nn.atividadeId === a.id
         );
         total += ((n?.valor ?? 0) / cap) * 10;
         count++;
       }
+      if (count === 0) return null;
       return {
         id: a.id,
         nome: a.nome,
         bimestre: periodo.ordem,
-        media: count === 0 ? 0 : total / count,
+        media: total / count,
       };
     })
     .filter((a): a is AtividadeRank => a !== null)
@@ -201,8 +218,8 @@ export async function getAnaliseTurma(
     bimRefB = periodoB.ordem;
     const deltas = alunos
       .map((aluno) => {
-        const mA = mediaBimestre(aluno.id, periodoA, atividades, notas);
-        const mB = mediaBimestre(aluno.id, periodoB, atividades, notas);
+        const mA = mediaBimestre(aluno.id, periodoA, atividadesNorm, notas);
+        const mB = mediaBimestre(aluno.id, periodoB, atividadesNorm, notas);
         if (mA === null || mB === null) return null;
         return {
           alunoId: aluno.id,

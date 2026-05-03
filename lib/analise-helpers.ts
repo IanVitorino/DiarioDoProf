@@ -4,6 +4,12 @@ export interface AtividadeMin {
   id: string;
   valorMaximo: number;
   periodoId: string;
+  /**
+   * "TODOS"        → todos os alunos da turma fazem.
+   * "SELECIONADOS" → apenas os alunos em `alunosAtribuidos` fazem.
+   */
+  tipoAtribuicao?: "TODOS" | "SELECIONADOS";
+  alunosAtribuidos?: string[];
 }
 
 export interface NotaMin {
@@ -18,9 +24,17 @@ export interface PeriodoMin {
   modoCalculo: "MEDIA" | "SOMA";
 }
 
+/** True se a atividade conta para o aluno (default: TODOS). */
+export function alunoFazAtividade(atividade: AtividadeMin, alunoId: string) {
+  if (!atividade.tipoAtribuicao || atividade.tipoAtribuicao === "TODOS") {
+    return true;
+  }
+  return (atividade.alunosAtribuidos ?? []).includes(alunoId);
+}
+
 /**
  * Média de um aluno num bimestre específico (sempre 0-10).
- * Retorna `null` se o bimestre não tem atividades.
+ * Retorna `null` se o aluno não tem nenhuma atividade atribuída no bimestre.
  * Vazio (sem nota lançada) conta como 0.
  *
  * - Modo MEDIA: average simples das notas (cap efetivo 10 por célula).
@@ -32,12 +46,14 @@ export function mediaBimestre(
   atividades: AtividadeMin[],
   notas: NotaMin[]
 ): number | null {
-  const ativsDoBim = atividades.filter((a) => a.periodoId === periodo.id);
-  if (ativsDoBim.length === 0) return null;
+  const ativsDoAluno = atividades.filter(
+    (a) => a.periodoId === periodo.id && alunoFazAtividade(a, alunoId),
+  );
+  if (ativsDoAluno.length === 0) return null;
 
   if (periodo.modoCalculo === "SOMA") {
     let sum = 0;
-    for (const a of ativsDoBim) {
+    for (const a of ativsDoAluno) {
       const nota = notas.find(
         (n) => n.alunoId === alunoId && n.atividadeId === a.id
       );
@@ -48,18 +64,18 @@ export function mediaBimestre(
 
   // MEDIA: average simples
   let totalValor = 0;
-  for (const a of ativsDoBim) {
+  for (const a of ativsDoAluno) {
     const nota = notas.find(
       (n) => n.alunoId === alunoId && n.atividadeId === a.id
     );
     totalValor += nota?.valor ?? 0;
   }
-  return totalValor / ativsDoBim.length;
+  return totalValor / ativsDoAluno.length;
 }
 
 /**
- * Média anual: média das médias dos bimestres que têm atividades.
- * Retorna `null` se nenhum bimestre tem atividades.
+ * Média anual: média das médias dos bimestres que têm atividades atribuídas ao aluno.
+ * Retorna `null` se nenhum bimestre tem atividades pra ele.
  */
 export function mediaAnual(
   alunoId: string,
