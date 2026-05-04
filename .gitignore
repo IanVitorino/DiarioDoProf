@@ -46,3 +46,6 @@ tsconfig.tsbuildinfo
 # user uploads (manter só o .gitkeep das pastas)
 /public/uploads/avatars/*
 !/public/uploads/avatars/.gitkeep
+
+# Claude Code — settings locais não devem ser versionados
+.claude/settings.local.json

@@ -90,6 +90,9 @@ export function MaskedDatePicker({
           allowInput: true,
           clickOpens: false,
           static: staticPosition,
+          // Sem isso, o Flatpickr troca pelo <input type="date"> nativo do
+          // browser em mobile, fazendo o campo aparecer duplicado.
+          disableMobile: true,
           defaultDate: isoToLocalDate(value),
           minDate,
           maxDate,
