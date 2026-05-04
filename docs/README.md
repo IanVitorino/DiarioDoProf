@@ -8,12 +8,14 @@
 
 | Doc | Tema |
 |---|---|
+| [`setup.md`](setup.md) | Como rodar local: env vars, Postgres, migrations, seeds, troubleshooting |
 | [`contexto-inicial.md`](contexto-inicial.md) | Visão de produto, premissas, stack, decisões fechadas, pendências |
 | [`parametros.md`](parametros.md) | Cadastros (turmas, alunos, períodos, atividades, grupos), modelo de dados, server actions |
 | [`notas.md`](notas.md) | Grid de notas, modos MEDIA/SOMA, atribuição, reescala automática, notas em grupo |
 | [`analise-turma.md`](analise-turma.md) | Dashboard analítico da turma (médias, distribuição, ranking, evolução) |
 | [`dashboard-aluno.md`](dashboard-aluno.md) | Dashboard individual do aluno (média anual, rank, tendência, atividades) |
 | [`dashboard-atividades.md`](dashboard-atividades.md) | Análise de uma atividade específica (KPIs, histograma, distribuição, grupos) |
+| [`ajuda.md`](ajuda.md) | Central de ajuda, FAQ, página de vídeos (player + listas) |
 | [`perfil-e-auth.md`](perfil-e-auth.md) | Autenticação (NextAuth + Credentials), tela de perfil, avatar de iniciais |
 | [`ui-e-tema.md`](ui-e-tema.md) | Layout, tema teal, sidebar/navbar, componentes compartilhados, animações |
 
