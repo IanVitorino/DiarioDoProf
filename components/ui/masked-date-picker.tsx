@@ -80,7 +80,7 @@ export function MaskedDatePicker({
 }: Props) {
   const fpRef = React.useRef<any>(null);
   return (
-    <div className="relative [&_.flatpickr-wrapper]:block [&_.flatpickr-wrapper]:w-full">
+    <div className="relative [&_.flatpickr-wrapper]:block [&_.flatpickr-wrapper]:w-full [&_.flatpickr-mobile]:!hidden">
       <Flatpickr
         ref={fpRef}
         id={id}
