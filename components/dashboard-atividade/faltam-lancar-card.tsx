@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { CheckCircle2, ChevronRight, ClipboardList } from "lucide-react";
 
 interface Props {
-  alunos: { alunoId: string; nome: string }[];
+  alunos: { alunoId: string; nome: string; inativo?: boolean }[];
   turmaId: string;
   bimestre: number;
 }
@@ -48,9 +48,16 @@ export function FaltamLancarCard({ alunos, turmaId, bimestre }: Props) {
         {alunos.map((a) => (
           <div
             key={a.alunoId}
-            className="py-2 text-sm text-default-700 truncate"
+            className={`py-2 text-sm flex items-center gap-2 ${
+              a.inativo ? "text-default-500 opacity-70" : "text-default-700"
+            }`}
           >
-            {a.nome}
+            <span className="truncate">{a.nome}</span>
+            {a.inativo && (
+              <span className="inline-flex items-center rounded bg-default-200 text-default-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide shrink-0">
+                Inativo
+              </span>
+            )}
           </div>
         ))}
       </div>

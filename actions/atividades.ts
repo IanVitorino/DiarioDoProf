@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getProfessorIdOrThrow } from "@/lib/session";
 import { ensure4Periodos } from "@/lib/periodos-helper";
+import { isAlunoAtivoNoBimestre } from "@/lib/analise-helpers";
 
 const atividadeSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
@@ -196,22 +197,33 @@ export async function setAtribuicaoAtividade(
 
   const atividade = await prisma.atividade.findFirst({
     where: { id: atividadeId, professorId },
-    include: { periodo: { select: { turmaId: true } } },
+    include: { periodo: { select: { turmaId: true, ordem: true } } },
   });
   if (!atividade) throw new Error("Atividade não encontrada");
 
   const turmaId = atividade.periodo.turmaId;
+  const ordemBim = atividade.periodo.ordem;
 
   const alunosTurma = await prisma.aluno.findMany({
     where: { turmaId, professorId },
-    select: { id: true },
+    select: { id: true, inativoApartirDeBimestre: true },
   });
   const alunosTurmaIds = new Set(alunosTurma.map((a) => a.id));
+  const alunosAtivosBim = alunosTurma.filter((a) =>
+    isAlunoAtivoNoBimestre(a.inativoApartirDeBimestre, ordemBim),
+  );
+  const alunosAtivosBimIds = new Set(alunosAtivosBim.map((a) => a.id));
 
   // Filtra apenas alunos que pertencem à turma (defesa em profundidade)
   const validIds = alunoIds.filter((id) => alunosTurmaIds.has(id));
-  const todosMarcados =
-    validIds.length === alunosTurmaIds.size && alunosTurmaIds.size > 0;
+  // "TODOS" = todos os ativos no bimestre estão marcados
+  const todosAtivosMarcados =
+    alunosAtivosBimIds.size > 0 &&
+    Array.from(alunosAtivosBimIds).every((id) => validIds.includes(id));
+  const semInativosMarcados = validIds.every((id) =>
+    alunosAtivosBimIds.has(id),
+  );
+  const todosMarcados = todosAtivosMarcados && semInativosMarcados;
 
   if (todosMarcados) {
     // Volta para "TODOS" e limpa a tabela de junção.

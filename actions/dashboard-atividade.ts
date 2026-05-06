@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getProfessorIdOrThrow } from "@/lib/session";
+import { isAlunoAtivoNoBimestre } from "@/lib/analise-helpers";
 
 export type Faixa = "vermelha" | "alerta" | "azul";
 
@@ -18,13 +19,20 @@ export interface AlunoBar {
   valorNormalizado: number; // 0-10
   temNota: boolean;
   faixa: Faixa;
+  inativo?: boolean;
 }
 
 export interface GrupoBar {
   grupoId: string;
   nome: string;
   tema: string | null;
-  membros: { alunoId: string; nome: string; valor: number; temNota: boolean }[];
+  membros: {
+    alunoId: string;
+    nome: string;
+    valor: number;
+    temNota: boolean;
+    inativo?: boolean;
+  }[];
   mediaNormalizada: number; // média das notas dos membros, 0-10
   totalMembros: number;
   membrosComNota: number;
@@ -52,7 +60,7 @@ export interface DashboardAtividadeResult {
   };
   distribuicao: { vermelha: number; alerta: number; azul: number };
   alunos: AlunoBar[]; // já ordenados desc por valor
-  faltamLancar: { alunoId: string; nome: string }[];
+  faltamLancar: { alunoId: string; nome: string; inativo?: boolean }[];
   grupos: GrupoBar[]; // vazio se atividade não é GRUPO
 }
 
@@ -88,19 +96,31 @@ export async function getDashboardAtividade(
 
   const alunosTurma = await prisma.aluno.findMany({
     where: { turmaId: turma.id, professorId },
-    select: { id: true, nome: true },
+    select: { id: true, nome: true, inativoApartirDeBimestre: true },
     orderBy: { nome: "asc" },
   });
 
   const alunoNomePorId = new Map<string, string>();
-  for (const a of alunosTurma) alunoNomePorId.set(a.id, a.nome);
+  const alunoInativoNoBim = new Map<string, boolean>();
+  for (const a of alunosTurma) {
+    alunoNomePorId.set(a.id, a.nome);
+    alunoInativoNoBim.set(
+      a.id,
+      !isAlunoAtivoNoBimestre(
+        a.inativoApartirDeBimestre,
+        atividade.periodo.ordem
+      )
+    );
+  }
 
   // Decide quem é "atribuído"
   const isTodos =
     atividade.tipoAtribuicao === "TODOS" ||
     !atividade.tipoAtribuicao;
   const idsAtribuidos = isTodos
-    ? alunosTurma.map((a) => a.id)
+    ? alunosTurma
+        .filter((a) => !alunoInativoNoBim.get(a.id))
+        .map((a) => a.id)
     : atividade.atribuicoes.map((x) => x.alunoId);
   const setAtribuidos = new Set(idsAtribuidos);
 
@@ -126,6 +146,7 @@ export async function getDashboardAtividade(
         valorNormalizado,
         temNota,
         faixa: classificar(valorNormalizado),
+        inativo: alunoInativoNoBim.get(id) ?? false,
       };
     })
     .sort((a, b) => {
@@ -157,7 +178,7 @@ export async function getDashboardAtividade(
 
   const faltamLancar = alunosBar
     .filter((a) => !a.temNota)
-    .map((a) => ({ alunoId: a.alunoId, nome: a.nome }));
+    .map((a) => ({ alunoId: a.alunoId, nome: a.nome, inativo: a.inativo }));
 
   // Grupos (apenas se atividade for GRUPO)
   const grupos: GrupoBar[] =
@@ -167,7 +188,13 @@ export async function getDashboardAtividade(
             const nome = alunoNomePorId.get(m.alunoId) ?? "—";
             const valor = notaPorAluno.get(m.alunoId) ?? 0;
             const temNota = notaPorAluno.has(m.alunoId);
-            return { alunoId: m.alunoId, nome, valor, temNota };
+            return {
+              alunoId: m.alunoId,
+              nome,
+              valor,
+              temNota,
+              inativo: alunoInativoNoBim.get(m.alunoId) ?? false,
+            };
           });
           const comNota = membros.filter((m) => m.temNota);
           const mediaNormalizada =

@@ -1,6 +1,7 @@
 import { listPeriodosComAtividades } from "@/actions/atividades";
 import { listAlunosByTurma } from "@/actions/alunos";
 import { getTurma } from "@/actions/turmas";
+import { isAlunoAtivoNoBimestre } from "@/lib/analise-helpers";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { User, Users } from "lucide-react";
@@ -51,10 +52,28 @@ export default async function AtividadesTabPage({
     nome: a.nome,
   }));
 
+  const alunosAtivosNoBim = (ordem: number) =>
+    alunosTurma
+      .filter((a) =>
+        isAlunoAtivoNoBimestre(a.inativoApartirDeBimestre, ordem),
+      )
+      .map((a) => ({ id: a.id, nome: a.nome }));
+
+  // Para grupos: lista todos os alunos da turma com flag de inatividade,
+  // pra preservar nome de inativos que já estão em grupos (histórico) mas
+  // bloquear sua adição em novos grupos via filtro no componente.
+  const alunosTurmaParaGrupos = (ordem: number) =>
+    alunosTurma.map((a) => ({
+      id: a.id,
+      nome: a.nome,
+      inativo: !isAlunoAtivoNoBimestre(a.inativoApartirDeBimestre, ordem),
+    }));
+
   return (
     <div className="space-y-6">
       {periodos.map((periodo) => {
         const modo = periodo.modoCalculo as "MEDIA" | "SOMA";
+        const alunosAtivosBim = alunosAtivosNoBim(periodo.ordem);
         return (
           <div key={periodo.id} className="space-y-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -134,7 +153,7 @@ export default async function AtividadesTabPage({
                               alunosAtribuidos={atividade.atribuicoes.map(
                                 (x) => x.alunoId,
                               )}
-                              alunosTurma={alunosTurmaSimple}
+                              alunosTurma={alunosAtivosBim}
                               modoCalculo={modo}
                               valorMaximo={atividade.valorMaximo}
                               notas={atividade.notas}
@@ -146,11 +165,12 @@ export default async function AtividadesTabPage({
                                 grupos={atividade.grupos}
                                 alunosAtribuidos={
                                   atividade.tipoAtribuicao === "TODOS"
-                                    ? alunosTurmaSimple
-                                    : alunosTurmaSimple.filter((a) =>
-                                        atividade.atribuicoes.some(
-                                          (x) => x.alunoId === a.id,
-                                        ),
+                                    ? alunosTurmaParaGrupos(periodo.ordem)
+                                    : alunosTurmaParaGrupos(periodo.ordem).filter(
+                                        (a) =>
+                                          atividade.atribuicoes.some(
+                                            (x) => x.alunoId === a.id,
+                                          ),
                                       )
                                 }
                                 modoCalculo={modo}

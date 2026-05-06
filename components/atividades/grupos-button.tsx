@@ -47,6 +47,7 @@ import { setNota } from "@/actions/notas";
 interface Aluno {
   id: string;
   nome: string;
+  inativo?: boolean;
 }
 
 interface GrupoIn {
@@ -407,14 +408,17 @@ function FormView({
     return set;
   }, [gruposExistentes, grupo]);
 
-  // Candidatos no MODO CREATE: alunos atribuídos que não estão em outros grupos
+  // Candidatos no MODO CREATE: alunos ATIVOS atribuídos que não estão em outros grupos
   const candidatosCreate = alunosAtribuidos.filter(
-    (a) => !alunosOcupadosEmOutros.has(a.id),
+    (a) => !a.inativo && !alunosOcupadosEmOutros.has(a.id),
   );
 
   // Candidatos no MODO EDIT/PICKER: igual + ainda não está neste grupo
   const candidatosAdd = alunosAtribuidos.filter(
-    (a) => !alunosOcupadosEmOutros.has(a.id) && !selecionados.has(a.id),
+    (a) =>
+      !a.inativo &&
+      !alunosOcupadosEmOutros.has(a.id) &&
+      !selecionados.has(a.id),
   );
 
   const alunoNomePorId = React.useMemo(() => {

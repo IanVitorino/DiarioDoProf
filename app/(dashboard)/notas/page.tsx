@@ -173,6 +173,7 @@ export default async function NotasPage({
             atividades={grid!.atividades}
             notas={grid!.notas}
             modoCalculo={grid!.modoCalculo as "MEDIA" | "SOMA"}
+            bimestre={validBimestre}
           />
         </div>
       )}

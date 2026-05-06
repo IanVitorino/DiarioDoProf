@@ -156,11 +156,20 @@ export function VisaoGrupos({ grupos, capEfetivo }: Props) {
               {g.membros.map((m) => (
                 <div
                   key={m.alunoId}
-                  className="flex items-center justify-between gap-2"
+                  className={`flex items-center justify-between gap-2 ${
+                    m.inativo ? "opacity-70" : ""
+                  }`}
                 >
-                  <span className="text-sm text-default-800 truncate">
-                    {m.nome}
-                  </span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm text-default-800 truncate">
+                      {m.nome}
+                    </span>
+                    {m.inativo && (
+                      <span className="inline-flex items-center rounded bg-default-200 text-default-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide shrink-0">
+                        Inativo
+                      </span>
+                    )}
+                  </div>
                   {m.temNota ? (
                     <Badge
                       variant="soft"

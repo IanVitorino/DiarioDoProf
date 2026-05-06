@@ -2,12 +2,13 @@
 
 import { prisma } from "@/lib/prisma";
 import { getProfessorIdOrThrow } from "@/lib/session";
-import { mediaBimestre } from "@/lib/analise-helpers";
+import { mediaBimestre, isAlunoAtivoNoBimestre } from "@/lib/analise-helpers";
 
 export interface RankedAluno {
   alunoId: string;
   nome: string;
   media: number;
+  inativo: boolean;
 }
 
 export interface RankedDelta {
@@ -16,6 +17,7 @@ export interface RankedDelta {
   mediaA: number;
   mediaB: number;
   delta: number;
+  inativo: boolean;
 }
 
 export interface AtividadeRank {
@@ -71,7 +73,7 @@ export async function getAnaliseTurma(
   const [alunos, periodos, atividades, notas] = await Promise.all([
     prisma.aluno.findMany({
       where: { turmaId, professorId },
-      select: { id: true, nome: true },
+      select: { id: true, nome: true, inativoApartirDeBimestre: true },
     }),
     prisma.periodo.findMany({
       where: { turmaId, professorId },
@@ -115,10 +117,19 @@ export async function getAnaliseTurma(
   );
 
   // Média de cada aluno na seleção (média das médias dos bimestres selecionados)
-  const mediaAluno = (alunoId: string): number | null => {
+  const mediaAluno = (
+    alunoId: string,
+    inativoApartirDeBimestre: number | null
+  ): number | null => {
     const medias: number[] = [];
     for (const p of periodosSel) {
-      const m = mediaBimestre(alunoId, p, atividadesNorm, notas);
+      const m = mediaBimestre(
+        alunoId,
+        p,
+        atividadesNorm,
+        notas,
+        inativoApartirDeBimestre
+      );
       if (m !== null) medias.push(m);
     }
     if (medias.length === 0) return null;
@@ -127,7 +138,7 @@ export async function getAnaliseTurma(
 
   const dadosAlunos = alunos.map((a) => ({
     aluno: a,
-    media: mediaAluno(a.id),
+    media: mediaAluno(a.id, a.inativoApartirDeBimestre),
   }));
 
   const mediasValidas = dadosAlunos
@@ -154,7 +165,13 @@ export async function getAnaliseTurma(
   const mediaPorBimestre: MediaBimPoint[] = periodosSel.map((p) => {
     const medias: number[] = [];
     for (const a of alunos) {
-      const m = mediaBimestre(a.id, p, atividadesNorm, notas);
+      const m = mediaBimestre(
+        a.id,
+        p,
+        atividadesNorm,
+        notas,
+        a.inativoApartirDeBimestre
+      );
       if (m !== null) medias.push(m);
     }
     return {
@@ -179,6 +196,8 @@ export async function getAnaliseTurma(
       let total = 0;
       let count = 0;
       for (const aluno of alunos) {
+        if (!isAlunoAtivoNoBimestre(aluno.inativoApartirDeBimestre, periodo.ordem))
+          continue;
         if (!isTodos && !atribuidos.has(aluno.id)) continue;
         const n = notas.find(
           (nn) => nn.alunoId === aluno.id && nn.atividadeId === a.id
@@ -200,7 +219,12 @@ export async function getAnaliseTurma(
   // Top / Bottom alunos
   const ranked = dadosAlunos
     .filter((d): d is { aluno: typeof d.aluno; media: number } => d.media !== null)
-    .map((d) => ({ alunoId: d.aluno.id, nome: d.aluno.nome, media: d.media }));
+    .map((d) => ({
+      alunoId: d.aluno.id,
+      nome: d.aluno.nome,
+      media: d.media,
+      inativo: d.aluno.inativoApartirDeBimestre != null,
+    }));
 
   const topAlunos = [...ranked].sort((a, b) => b.media - a.media).slice(0, LIMITE);
   const bottomAlunos = [...ranked].sort((a, b) => a.media - b.media).slice(0, LIMITE);
@@ -218,8 +242,20 @@ export async function getAnaliseTurma(
     bimRefB = periodoB.ordem;
     const deltas = alunos
       .map((aluno) => {
-        const mA = mediaBimestre(aluno.id, periodoA, atividadesNorm, notas);
-        const mB = mediaBimestre(aluno.id, periodoB, atividadesNorm, notas);
+        const mA = mediaBimestre(
+          aluno.id,
+          periodoA,
+          atividadesNorm,
+          notas,
+          aluno.inativoApartirDeBimestre
+        );
+        const mB = mediaBimestre(
+          aluno.id,
+          periodoB,
+          atividadesNorm,
+          notas,
+          aluno.inativoApartirDeBimestre
+        );
         if (mA === null || mB === null) return null;
         return {
           alunoId: aluno.id,
@@ -227,6 +263,7 @@ export async function getAnaliseTurma(
           mediaA: mA,
           mediaB: mB,
           delta: mB - mA,
+          inativo: aluno.inativoApartirDeBimestre != null,
         };
       })
       .filter((d): d is RankedDelta => d !== null);

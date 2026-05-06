@@ -24,6 +24,15 @@ export interface PeriodoMin {
   modoCalculo: "MEDIA" | "SOMA";
 }
 
+/** True se o aluno está ativo em um determinado bimestre. */
+export function isAlunoAtivoNoBimestre(
+  inativoApartirDeBimestre: number | null | undefined,
+  ordemBimestre: number
+): boolean {
+  if (inativoApartirDeBimestre == null) return true;
+  return ordemBimestre < inativoApartirDeBimestre;
+}
+
 /** True se a atividade conta para o aluno (default: TODOS). */
 export function alunoFazAtividade(atividade: AtividadeMin, alunoId: string) {
   if (!atividade.tipoAtribuicao || atividade.tipoAtribuicao === "TODOS") {
@@ -34,7 +43,8 @@ export function alunoFazAtividade(atividade: AtividadeMin, alunoId: string) {
 
 /**
  * Média de um aluno num bimestre específico (sempre 0-10).
- * Retorna `null` se o aluno não tem nenhuma atividade atribuída no bimestre.
+ * Retorna `null` se o aluno não tem nenhuma atividade atribuída no bimestre,
+ * ou se o aluno está inativo a partir desse bimestre.
  * Vazio (sem nota lançada) conta como 0.
  *
  * - Modo MEDIA: average simples das notas (cap efetivo 10 por célula).
@@ -44,8 +54,13 @@ export function mediaBimestre(
   alunoId: string,
   periodo: PeriodoMin,
   atividades: AtividadeMin[],
-  notas: NotaMin[]
+  notas: NotaMin[],
+  inativoApartirDeBimestre?: number | null
 ): number | null {
+  if (!isAlunoAtivoNoBimestre(inativoApartirDeBimestre, periodo.ordem)) {
+    return null;
+  }
+
   const ativsDoAluno = atividades.filter(
     (a) => a.periodoId === periodo.id && alunoFazAtividade(a, alunoId),
   );
@@ -74,18 +89,20 @@ export function mediaBimestre(
 }
 
 /**
- * Média anual: média das médias dos bimestres que têm atividades atribuídas ao aluno.
- * Retorna `null` se nenhum bimestre tem atividades pra ele.
+ * Média anual: média das médias dos bimestres que têm atividades atribuídas ao aluno
+ * e nos quais o aluno estava ativo.
+ * Retorna `null` se nenhum bimestre conta para ele.
  */
 export function mediaAnual(
   alunoId: string,
   periodos: PeriodoMin[],
   atividades: AtividadeMin[],
-  notas: NotaMin[]
+  notas: NotaMin[],
+  inativoApartirDeBimestre?: number | null
 ): number | null {
   const medias: number[] = [];
   for (const p of periodos) {
-    const m = mediaBimestre(alunoId, p, atividades, notas);
+    const m = mediaBimestre(alunoId, p, atividades, notas, inativoApartirDeBimestre);
     if (m !== null) medias.push(m);
   }
   if (medias.length === 0) return null;

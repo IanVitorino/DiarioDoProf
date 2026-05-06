@@ -236,6 +236,7 @@ export default async function AnaliseTurmaPage({
                 position={i + 1}
                 nome={a.nome}
                 right={a.media.toFixed(1)}
+                inativo={a.inativo}
               />
             ))
           )}
@@ -251,6 +252,7 @@ export default async function AnaliseTurmaPage({
                 position={i + 1}
                 nome={a.nome}
                 right={a.media.toFixed(1)}
+                inativo={a.inativo}
               />
             ))
           )}
@@ -267,6 +269,7 @@ export default async function AnaliseTurmaPage({
                     key={d.alunoId}
                     position={i + 1}
                     nome={d.nome}
+                    inativo={d.inativo}
                     right={
                       <span className="flex items-center gap-1 text-emerald-600">
                         <ArrowUp className="w-3 h-3" />
@@ -287,6 +290,7 @@ export default async function AnaliseTurmaPage({
                     key={d.alunoId}
                     position={i + 1}
                     nome={d.nome}
+                    inativo={d.inativo}
                     right={
                       <span className="flex items-center gap-1 text-red-600">
                         <ArrowDown className="w-3 h-3" />

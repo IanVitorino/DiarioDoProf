@@ -12,6 +12,7 @@ const tabs = [
   { label: "Alunos", segment: "alunos" },
   { label: "Períodos", segment: "periodos" },
   { label: "Atividades", segment: "atividades" },
+  { label: "Mapeamento", segment: "mapeamento" },
 ];
 
 export function TurmaTabNav({ turmaId }: TabNavProps) {

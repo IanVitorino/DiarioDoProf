@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ClipboardList,
   Users,
+  UserMinus,
 } from "lucide-react";
 import { listTurmas } from "@/actions/turmas";
 import {
@@ -94,6 +95,28 @@ async function DashboardContent({
 
   return (
     <div className="space-y-5">
+      {data.aluno.inativoApartirDeBimestre != null && (
+        <div className="flex items-start gap-3 rounded-md border border-default-200 bg-default-100/60 dark:bg-default-100/30 p-4">
+          <div className="rounded-full bg-default-200 p-2 shrink-0">
+            <UserMinus className="w-4 h-4 text-default-700" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-default-900">
+              Aluno inativo desde o {bimestreNome(data.aluno.inativoApartirDeBimestre)}
+            </p>
+            {data.aluno.motivoInativacao && (
+              <p className="text-xs text-default-600 mt-0.5">
+                Motivo: {data.aluno.motivoInativacao}
+              </p>
+            )}
+            <p className="text-xs text-default-500 mt-0.5">
+              Bimestres anteriores contam normalmente; bimestres seguintes não
+              entram nas médias.
+            </p>
+          </div>
+        </div>
+      )}
+
       <IdentificacaoCard
         aluno={data.aluno}
         turma={data.turma}

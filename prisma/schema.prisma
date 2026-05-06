@@ -75,8 +75,9 @@ model Turma {
   professorId String
   professor   Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
 
-  alunos   Aluno[]
-  periodos Periodo[]
+  alunos     Aluno[]
+  periodos   Periodo[]
+  mapeamento Mapeamento?
 
   @@index([professorId])
 }
@@ -87,6 +88,10 @@ model Aluno {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  inativoApartirDeBimestre Int?
+  inativadoEm              DateTime?
+  motivoInativacao         String?
+
   professorId String
   professor   Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
   turmaId     String
@@ -95,6 +100,7 @@ model Aluno {
   notas       Nota[]
   atribuicoes AtividadeAluno[]
   grupos      GrupoAluno[]
+  carteira    Carteira?
 
   @@index([professorId])
   @@index([turmaId])
@@ -207,4 +213,40 @@ model Nota {
 
   @@unique([alunoId, atividadeId])
   @@index([professorId])
+}
+
+model Mapeamento {
+  id                 String   @id @default(uuid())
+  linhas             Int
+  colunas            Int
+  refDireitaTopo     String?
+  refEsquerdaBase    String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  turmaId     String @unique
+  turma       Turma  @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  professorId String
+
+  carteiras Carteira[]
+
+  @@index([professorId])
+}
+
+model Carteira {
+  id        String   @id @default(uuid())
+  linha     Int
+  coluna    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mapeamentoId String
+  mapeamento   Mapeamento @relation(fields: [mapeamentoId], references: [id], onDelete: Cascade)
+  alunoId      String?    @unique
+  aluno        Aluno?     @relation(fields: [alunoId], references: [id], onDelete: SetNull)
+  professorId  String
+
+  @@unique([mapeamentoId, linha, coluna])
+  @@index([professorId])
+  @@index([alunoId])
 }

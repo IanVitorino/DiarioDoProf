@@ -2,7 +2,11 @@
 
 import { prisma } from "@/lib/prisma";
 import { getProfessorIdOrThrow } from "@/lib/session";
-import { mediaBimestre, mediaAnual } from "@/lib/analise-helpers";
+import {
+  mediaBimestre,
+  mediaAnual,
+  isAlunoAtivoNoBimestre,
+} from "@/lib/analise-helpers";
 
 export type Trend = "evolucao" | "estavel" | "queda";
 
@@ -19,7 +23,14 @@ export interface AtividadePonto {
 }
 
 export interface DashboardAlunoResult {
-  aluno: { id: string; nome: string; numeroChamada: number };
+  aluno: {
+    id: string;
+    nome: string;
+    numeroChamada: number;
+    inativoApartirDeBimestre: number | null;
+    inativadoEm: Date | null;
+    motivoInativacao: string | null;
+  };
   turma: {
     id: string;
     nome: string;
@@ -63,7 +74,13 @@ export async function getDashboardAluno(
 
   const aluno = await prisma.aluno.findFirst({
     where: { id: alunoId, turmaId, professorId },
-    select: { id: true, nome: true },
+    select: {
+      id: true,
+      nome: true,
+      inativoApartirDeBimestre: true,
+      inativadoEm: true,
+      motivoInativacao: true,
+    },
   });
   if (!aluno) throw new Error("Aluno não encontrado");
 
@@ -92,7 +109,7 @@ export async function getDashboardAluno(
     }),
     prisma.aluno.findMany({
       where: { turmaId, professorId },
-      select: { id: true, nome: true },
+      select: { id: true, nome: true, inativoApartirDeBimestre: true },
     }),
   ]);
 
@@ -104,12 +121,24 @@ export async function getDashboardAluno(
   // Médias por bimestre
   const mediasPorBimAluno = periodos.map((p) => ({
     ordem: p.ordem,
-    media: mediaBimestre(aluno.id, p, atividadesNorm, notas),
+    media: mediaBimestre(
+      aluno.id,
+      p,
+      atividadesNorm,
+      notas,
+      aluno.inativoApartirDeBimestre
+    ),
   }));
   const mediasPorBimTurma = periodos.map((p) => {
     const medias: number[] = [];
     for (const a of todosAlunos) {
-      const m = mediaBimestre(a.id, p, atividadesNorm, notas);
+      const m = mediaBimestre(
+        a.id,
+        p,
+        atividadesNorm,
+        notas,
+        a.inativoApartirDeBimestre
+      );
       if (m !== null) medias.push(m);
     }
     return {
@@ -121,13 +150,25 @@ export async function getDashboardAluno(
     };
   });
 
-  const minhaMediaAnual = mediaAnual(aluno.id, periodos, atividadesNorm, notas);
+  const minhaMediaAnual = mediaAnual(
+    aluno.id,
+    periodos,
+    atividadesNorm,
+    notas,
+    aluno.inativoApartirDeBimestre
+  );
 
   // Rank: ordena alunos por média anual desc
   const ranking = todosAlunos
     .map((a) => ({
       id: a.id,
-      media: mediaAnual(a.id, periodos, atividadesNorm, notas),
+      media: mediaAnual(
+        a.id,
+        periodos,
+        atividadesNorm,
+        notas,
+        a.inativoApartirDeBimestre
+      ),
     }))
     .sort((a, b) => (b.media ?? -Infinity) - (a.media ?? -Infinity));
   const rank = ranking.findIndex((r) => r.id === aluno.id) + 1;
@@ -166,6 +207,14 @@ export async function getDashboardAluno(
     .map((a) => {
       const periodo = periodos.find((p) => p.id === a.periodoId);
       if (!periodo) return null;
+      // Pular atividades em bimestres em que o aluno está inativo
+      if (
+        !isAlunoAtivoNoBimestre(
+          aluno.inativoApartirDeBimestre,
+          periodo.ordem
+        )
+      )
+        return null;
       // Apenas atividades atribuídas ao aluno
       const isTodos =
         !a.tipoAtribuicao || a.tipoAtribuicao === "TODOS";
@@ -212,7 +261,14 @@ export async function getDashboardAluno(
   }
 
   return {
-    aluno: { id: aluno.id, nome: aluno.nome, numeroChamada },
+    aluno: {
+      id: aluno.id,
+      nome: aluno.nome,
+      numeroChamada,
+      inativoApartirDeBimestre: aluno.inativoApartirDeBimestre,
+      inativadoEm: aluno.inativadoEm,
+      motivoInativacao: aluno.motivoInativacao,
+    },
     turma: {
       id: turma.id,
       nome: turma.nome,

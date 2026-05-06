@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getProfessorIdOrThrow } from "@/lib/session";
+import { isAlunoAtivoNoBimestre } from "@/lib/analise-helpers";
 
 const grupoSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório").max(80),
@@ -32,12 +33,17 @@ export async function listGrupos(atividadeId: string) {
  * Filtra alunoIds para apenas os que estão atribuídos à atividade
  * e que não estão em outro grupo da mesma atividade (excluindo o grupo
  * que está sendo editado, se houver).
+ *
+ * Inativos no bimestre da atividade são removidos, exceto os listados em
+ * `permitirInativosIds` (tipicamente os membros já presentes no grupo —
+ * preserva histórico ao editar um grupo).
  */
 async function alunosValidosParaGrupo(
   atividadeId: string,
   professorId: string,
   alunoIdsDesejados: string[],
   excludeGrupoId?: string,
+  permitirInativosIds?: string[],
 ): Promise<string[]> {
   if (alunoIdsDesejados.length === 0) return [];
 
@@ -47,19 +53,32 @@ async function alunosValidosParaGrupo(
       id: true,
       tipoAtribuicao: true,
       atribuicoes: { select: { alunoId: true } },
-      periodo: { select: { turmaId: true } },
+      periodo: { select: { turmaId: true, ordem: true } },
     },
   });
   if (!atividade) throw new Error("Atividade não encontrada");
 
+  // Mapa de inativação (turma toda, para checar status no bimestre da atividade)
+  const alunosTurma = await prisma.aluno.findMany({
+    where: { turmaId: atividade.periodo.turmaId, professorId },
+    select: { id: true, inativoApartirDeBimestre: true },
+  });
+  const inativoNoBim = new Map<string, boolean>();
+  for (const a of alunosTurma) {
+    inativoNoBim.set(
+      a.id,
+      !isAlunoAtivoNoBimestre(
+        a.inativoApartirDeBimestre,
+        atividade.periodo.ordem,
+      ),
+    );
+  }
+  const permitir = new Set(permitirInativosIds ?? []);
+
   // Lista de alunos que podem fazer essa atividade
   let alunosAptos: Set<string>;
   if (atividade.tipoAtribuicao === "TODOS") {
-    const alunos = await prisma.aluno.findMany({
-      where: { turmaId: atividade.periodo.turmaId, professorId },
-      select: { id: true },
-    });
-    alunosAptos = new Set(alunos.map((a) => a.id));
+    alunosAptos = new Set(alunosTurma.map((a) => a.id));
   } else {
     alunosAptos = new Set(atividade.atribuicoes.map((x) => x.alunoId));
   }
@@ -75,9 +94,12 @@ async function alunosValidosParaGrupo(
   });
   const ocupados = new Set(outrosGrupos.map((g) => g.alunoId));
 
-  return alunoIdsDesejados.filter(
-    (id) => alunosAptos.has(id) && !ocupados.has(id),
-  );
+  return alunoIdsDesejados.filter((id) => {
+    if (!alunosAptos.has(id)) return false;
+    if (ocupados.has(id)) return false;
+    if (inativoNoBim.get(id) && !permitir.has(id)) return false;
+    return true;
+  });
 }
 
 export async function createGrupo(atividadeId: string, input: unknown) {
@@ -126,15 +148,18 @@ export async function updateGrupo(grupoId: string, input: unknown) {
     where: { id: grupoId, professorId },
     include: {
       atividade: { include: { periodo: { select: { turmaId: true } } } },
+      membros: { select: { alunoId: true } },
     },
   });
   if (!grupo) throw new Error("Grupo não encontrado");
 
+  const membrosAtuais = grupo.membros.map((m) => m.alunoId);
   const validIds = await alunosValidosParaGrupo(
     grupo.atividadeId,
     professorId,
     data.alunoIds,
     grupoId,
+    membrosAtuais,
   );
   if (validIds.length === 0) {
     throw new Error("O grupo precisa de pelo menos um aluno");
