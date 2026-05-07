@@ -14,6 +14,12 @@ const inativarSchema = z.object({
   motivo: z.string().trim().max(200).optional().nullable(),
 });
 
+const NOME_REGEX = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s'-]*$/;
+
+const importarSchema = z.object({
+  nomes: z.array(z.string().min(1).max(120)).min(1).max(500),
+});
+
 export async function listAlunosByTurma(turmaId: string) {
   const professorId = await getProfessorIdOrThrow();
   return prisma.aluno.findMany({
@@ -110,6 +116,48 @@ export async function inativarAluno(id: string, input: unknown) {
   revalidatePath(`/analise-turma`);
   revalidatePath(`/dashboard-aluno`);
   revalidatePath(`/dashboard-atividades`);
+}
+
+export async function importarAlunos(turmaId: string, input: unknown) {
+  const professorId = await getProfessorIdOrThrow();
+  const data = importarSchema.parse(input);
+
+  const turma = await prisma.turma.findFirst({
+    where: { id: turmaId, professorId },
+    select: { id: true },
+  });
+  if (!turma) throw new Error("Turma não encontrada");
+
+  // Sanitiza: trim + colapsa espaços + filtra inválidos (defesa em profundidade)
+  const limpos = Array.from(
+    new Set(
+      data.nomes
+        .map((n) => n.trim().replace(/\s+/g, " "))
+        .filter((n) => n !== "" && NOME_REGEX.test(n)),
+    ),
+  );
+  if (limpos.length === 0) {
+    return { inseridos: 0, duplicados: 0 };
+  }
+
+  // Pula nomes que já existem na turma (case-insensitive)
+  const existentes = await prisma.aluno.findMany({
+    where: { turmaId, professorId },
+    select: { nome: true },
+  });
+  const setExistentes = new Set(existentes.map((a) => a.nome.toLowerCase()));
+
+  const aInserir = limpos.filter((n) => !setExistentes.has(n.toLowerCase()));
+  const duplicados = limpos.length - aInserir.length;
+
+  if (aInserir.length > 0) {
+    await prisma.aluno.createMany({
+      data: aInserir.map((nome) => ({ nome, turmaId, professorId })),
+    });
+  }
+
+  revalidatePath(`/turmas/${turmaId}/alunos`);
+  return { inseridos: aInserir.length, duplicados };
 }
 
 export async function reativarAluno(id: string) {

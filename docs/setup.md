@@ -36,7 +36,7 @@ DATABASE_URL="postgresql://<user>:<password>@localhost:5432/diariodoprof"
 
 # Segredo do NextAuth (qualquer string aleatória forte)
 AUTH_SECRET="<gere-uma-string-aleatoria-de-32-caracteres>"
-NEXTAUTH_URL="http://localhost:4785"
+NEXTAUTH_URL="http://localhost:4685"
 ```
 
 > Pra gerar `AUTH_SECRET`: `openssl rand -base64 32` ou qualquer gerador de senha de 32+ chars.
@@ -73,7 +73,7 @@ npx prisma generate
 npm run dev
 ```
 
-App sobe em **http://localhost:4785** (porta customizada — veja `package.json`).
+App sobe em **http://localhost:4685** (porta customizada — veja `package.json`).
 
 > O `npm run build` também roda `prisma migrate deploy` antes do `next build` (definido em `package.json`).
 
@@ -140,9 +140,9 @@ Mais detalhes em `README.md`.
 
 | Comando | O que faz |
 |---|---|
-| `npm run dev` | Sobe dev server na porta 4785 |
+| `npm run dev` | Sobe dev server na porta 4685 |
 | `npm run build` | Roda migrations + build de produção |
-| `npm run start` | Sobe versão de produção (porta 4785) |
+| `npm run start` | Sobe versão de produção (porta 4685) |
 | `npx prisma migrate deploy` | Aplica migrations pendentes |
 | `npx prisma generate` | Regenera Prisma client |
 | `npx prisma studio` | Abre UI gráfica do Postgres (porta 5555) |
@@ -163,8 +163,8 @@ Use `migrate deploy` — funciona em ambientes não-interativos.
 ### Cliente Prisma cacheado após mudança no schema
 Reinicie o dev server (`Ctrl+C` e `npm run dev` de novo). O singleton do Prisma fica em memória.
 
-### Porta 4785 ocupada
-Edite `package.json` e troque o `-p 4785` pro número que quiser.
+### Porta 4685 ocupada
+Edite `package.json` e troque o `-p 4685` pro número que quiser.
 
 ---
 

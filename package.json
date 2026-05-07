@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 4785",
+    "dev": "next dev -p 4685",
     "build": "prisma migrate deploy && next build",
-    "start": "next start -p 4785",
+    "start": "next start -p 4685",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },
@@ -137,6 +137,7 @@
     "tailwindcss-animate": "^1.0.6",
     "unist-util-visit": "^5.0.0",
     "vaul": "^0.8.0",
+    "xlsx": "^0.18.5",
     "zod": "^3.22.4",
     "zustand": "^4.4.1"
   },

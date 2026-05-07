@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { NovoAlunoButton } from "@/components/alunos/novo-aluno-button";
+import { ImportarAlunosButton } from "@/components/alunos/importar-alunos-button";
 import { AlunoActions } from "@/components/alunos/aluno-actions";
 import { AlunosStatusFilter } from "@/components/alunos/alunos-status-filter";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +53,10 @@ export default async function AlunosTabPage({
           current={status}
           counts={counts}
         />
-        <NovoAlunoButton turmaId={params.id} />
+        <div className="flex items-center gap-2">
+          <ImportarAlunosButton turmaId={params.id} />
+          <NovoAlunoButton turmaId={params.id} />
+        </div>
       </div>
 
       {alunos.length === 0 ? (
