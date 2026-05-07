@@ -107,12 +107,57 @@ export function ImportarAlunosButton({ turmaId }: { turmaId: string }) {
     return validarNomes(sheet, Number(colunaIndex), primeiraLinhaCabecalho);
   }, [sheet, colunaIndex, primeiraLinhaCabecalho]);
 
+  // Índices selecionados em validation.validos. Default: todos.
+  const [selecionados, setSelecionados] = React.useState<Set<number>>(
+    new Set(),
+  );
+
+  // Sempre que a validação muda (coluna trocada, header toggle), seleciona tudo.
+  React.useEffect(() => {
+    if (validation) {
+      setSelecionados(new Set(validation.validos.map((_, i) => i)));
+    } else {
+      setSelecionados(new Set());
+    }
+  }, [validation]);
+
+  const totalValidos = validation?.validos.length ?? 0;
+  const totalSelecionados = selecionados.size;
+  const allChecked = totalValidos > 0 && totalSelecionados === totalValidos;
+  const noneChecked = totalSelecionados === 0;
+  const headerCheckedState: boolean | "indeterminate" = allChecked
+    ? true
+    : noneChecked
+      ? false
+      : "indeterminate";
+
+  const toggleOne = (index: number) => {
+    setSelecionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const toggleAll = (checked: boolean) => {
+    if (!validation) return;
+    if (checked) {
+      setSelecionados(new Set(validation.validos.map((_, i) => i)));
+    } else {
+      setSelecionados(new Set());
+    }
+  };
+
   const onConfirmImport = () => {
-    if (!validation || validation.validos.length === 0) return;
+    if (!validation || totalSelecionados === 0) return;
+    const nomesParaImportar = validation.validos.filter((_, i) =>
+      selecionados.has(i),
+    );
     startTransition(async () => {
       try {
         const res = await importarAlunos(turmaId, {
-          nomes: validation.validos,
+          nomes: nomesParaImportar,
         });
         const partes: string[] = [];
         if (res.inseridos > 0) {
@@ -319,7 +364,7 @@ export function ImportarAlunosButton({ turmaId }: { turmaId: string }) {
                 </div>
               </DialogHeader>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-md border border-default-200 bg-emerald-500/5 p-3">
                   <div className="flex items-center gap-2 text-emerald-600">
                     <CheckCircle2 className="w-4 h-4" />
@@ -328,7 +373,18 @@ export function ImportarAlunosButton({ turmaId }: { turmaId: string }) {
                     </span>
                   </div>
                   <div className="text-2xl font-bold text-default-900 mt-1">
-                    {validation.validos.length}
+                    {totalValidos}
+                  </div>
+                </div>
+                <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+                  <div className="flex items-center gap-2 text-primary">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span className="text-xs font-semibold uppercase tracking-wider">
+                      Selecionados
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold text-default-900 mt-1">
+                    {totalSelecionados}
                   </div>
                 </div>
                 <div className="rounded-md border border-default-200 bg-default-100/40 p-3">
@@ -344,19 +400,37 @@ export function ImportarAlunosButton({ turmaId }: { turmaId: string }) {
                 </div>
               </div>
 
-              {validation.validos.length > 0 ? (
-                <div>
-                  <p className="text-xs font-medium text-default-700 mb-1.5">
-                    Serão importados:
-                  </p>
-                  <div className="max-h-44 overflow-y-auto rounded-md border border-default-200 divide-y divide-default-200 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {totalValidos > 0 ? (
+                <div className="rounded-md border border-default-200 overflow-hidden">
+                  <label className="flex items-center gap-3 px-3 py-2 bg-default-100 dark:bg-default-100/50 border-b border-default-200 cursor-pointer">
+                    <Checkbox
+                      checked={headerCheckedState}
+                      onCheckedChange={(c) => toggleAll(c === true)}
+                    />
+                    <span className="text-sm font-medium text-default-900">
+                      Selecionar todos
+                    </span>
+                    <span className="text-xs text-default-600">
+                      ({totalSelecionados} de {totalValidos})
+                    </span>
+                  </label>
+                  <div className="max-h-56 overflow-y-auto divide-y divide-default-200 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                     {validation.validos.map((nome, i) => (
-                      <div
-                        key={`${nome}-${i}`}
-                        className="px-3 py-1.5 text-sm text-default-800 truncate"
+                      <label
+                        key={i}
+                        className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-default-50 transition-colors"
                       >
-                        {nome}
-                      </div>
+                        <Checkbox
+                          checked={selecionados.has(i)}
+                          onCheckedChange={() => toggleOne(i)}
+                        />
+                        <span className="text-sm text-default-500 w-6 shrink-0 text-right">
+                          {i + 1}
+                        </span>
+                        <span className="text-sm text-default-800 truncate">
+                          {nome}
+                        </span>
+                      </label>
                     ))}
                   </div>
                 </div>
@@ -397,10 +471,10 @@ export function ImportarAlunosButton({ turmaId }: { turmaId: string }) {
                 <Button
                   type="button"
                   onClick={onConfirmImport}
-                  disabled={pending || validation.validos.length === 0}
+                  disabled={pending || totalSelecionados === 0}
                 >
                   {pending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Importar {validation.validos.length}
+                  Importar {totalSelecionados}
                 </Button>
               </DialogFooter>
             </>
