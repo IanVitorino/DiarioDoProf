@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { setNota } from "@/actions/notas";
 
@@ -95,6 +95,12 @@ function alunoInativoNoBim(aluno: Aluno, bimestre: number): boolean {
   );
 }
 
+function stripDiacritics(s: string) {
+  return s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+type AlunoNumerado = Aluno & { numero: number };
+
 export function NotasGrid({
   alunos,
   atividades,
@@ -112,10 +118,25 @@ export function NotasGrid({
 
   const [values, setValues] = React.useState<Record<string, string>>(initialValues);
   const [saving, setSaving] = React.useState<Record<string, boolean>>({});
+  const [filtro, setFiltro] = React.useState("");
 
   React.useEffect(() => {
     setValues(initialValues);
   }, [initialValues]);
+
+  const alunosNumerados = React.useMemo<AlunoNumerado[]>(
+    () => alunos.map((a, i) => ({ ...a, numero: i + 1 })),
+    [alunos],
+  );
+
+  const alunosFiltrados = React.useMemo<AlunoNumerado[]>(() => {
+    const q = stripDiacritics(filtro.trim());
+    if (q === "") return alunosNumerados;
+    return alunosNumerados.filter((a) => {
+      const haystack = stripDiacritics(`${a.numero} ${a.nome}`);
+      return haystack.includes(q);
+    });
+  }, [alunosNumerados, filtro]);
 
   if (atividades.length === 0) {
     return (
@@ -197,7 +218,34 @@ export function NotasGrid({
   const colunaFinalLabel = modoCalculo === "SOMA" ? "Total" : "Média";
 
   return (
-    <>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-default-400 pointer-events-none" />
+          <Input
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value)}
+            placeholder="Buscar por nome ou número"
+            className="pl-8 pr-8"
+          />
+          {filtro !== "" && (
+            <button
+              type="button"
+              onClick={() => setFiltro("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+              title="Limpar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        {filtro !== "" && (
+          <span className="text-xs text-default-500">
+            {alunosFiltrados.length} de {alunosNumerados.length}
+          </span>
+        )}
+      </div>
+
       {/* Desktop: tabela completa */}
       <Card className="p-0 overflow-x-auto hidden md:block">
         <Table>
@@ -224,14 +272,24 @@ export function NotasGrid({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {alunos.map((aluno, i) => {
+            {alunosFiltrados.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={atividades.length + 3}
+                  className="text-center py-8 text-sm text-default-500"
+                >
+                  Nenhum aluno encontrado pra esse filtro.
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {alunosFiltrados.map((aluno) => {
               const inativo = alunoInativoNoBim(aluno, bimestre);
               return (
                 <TableRow
                   key={aluno.id}
                   className={inativo ? "opacity-60" : undefined}
                 >
-                  <TableCell className="text-default-600">{i + 1}</TableCell>
+                  <TableCell className="text-default-600">{aluno.numero}</TableCell>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       <span>{aluno.nome}</span>
@@ -294,7 +352,7 @@ export function NotasGrid({
       {/* Mobile: uma atividade por vez */}
       <div className="md:hidden">
         <NotasGridMobile
-          alunos={alunos}
+          alunos={alunosFiltrados}
           atividades={atividades}
           modoCalculo={modoCalculo}
           bimestre={bimestre}
@@ -306,12 +364,12 @@ export function NotasGrid({
           colunaFinalLabel={colunaFinalLabel}
         />
       </div>
-    </>
+    </div>
   );
 }
 
 interface MobileProps {
-  alunos: Aluno[];
+  alunos: AlunoNumerado[];
   atividades: Atividade[];
   modoCalculo: Modo;
   bimestre: number;
@@ -394,9 +452,13 @@ function NotasGridMobile({
         <p className="p-6 text-sm text-default-500 text-center">
           Selecione uma atividade pra começar.
         </p>
+      ) : alunos.length === 0 ? (
+        <p className="p-6 text-sm text-default-500 text-center">
+          Nenhum aluno encontrado pra esse filtro.
+        </p>
       ) : (
         <div className="divide-y divide-default-200">
-          {alunos.map((aluno, i) => {
+          {alunos.map((aluno) => {
             const key = cellKey(aluno.id, atividade.id);
             const isSaving = !!saving[key];
             const inativo = alunoInativoNoBim(aluno, bimestre);
@@ -410,7 +472,7 @@ function NotasGridMobile({
                 }`}
               >
                 <span className="text-sm text-default-500 w-6 shrink-0">
-                  {i + 1}
+                  {aluno.numero}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
